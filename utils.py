@@ -1,3 +1,5 @@
+# This file houses algorithms that have not been segmented into their respective stages
+
 import cv2
 import numpy as np
 
@@ -30,7 +32,7 @@ def VJ_face_detector(input_video, width=0.6, height=1):
 
     raw_sig = []
 
-    face_cascade = cv2.CascadeClassifier("Necessary Files\\haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier(r"C:\Users\ilyas\PycharmProjects\pythonProject1\remote_PPG\Necessary Files\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
     for frame in extract_frames_yield(input_video):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -59,7 +61,7 @@ def VJ_face_detector(input_video, width=0.6, height=1):
     return raw_sig
 
 
-def moving_window(sig, fps=30, window_size=30, increment=1):
+def moving_window(sig, fps, window_size, increment):
     """
     :param sig:
         RGB signal
@@ -82,5 +84,15 @@ def moving_window(sig, fps=30, window_size=30, increment=1):
     return windowed_sig
 
 
-
+def get_fps(input_video):
+    """
+    :param input_video:
+        This takes in an input video file
+    :return:
+        Returns the fps of the video
+    """
+    vidcap = cv2.VideoCapture(input_video)
+    fps = vidcap.get(cv2.CAP_PROP_FPS)
+    vidcap.release()
+    return int(fps)
 

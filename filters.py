@@ -4,15 +4,16 @@ import numpy as np
 def normalize(sig):
     """
     :param sig:
-        Input signal to normalize
+        Input signal to normalize to have zero-mean and unit variance
     :return:
-        Normalized signal to have zero-mean and unit variance
+        Normalized signal
     """
     signal = np.array(sig)
     mean = np.mean(signal, axis=0)
     std_dev = np.std(signal, axis=0)
-
-    # Normalize each color channel to have zero-mean and unit variance
     normalized_signal = (signal - mean) / std_dev
 
-    return normalized_signal.tolist()
+    # Turn normalized signal to [[R] [G] [B]]
+    normalized = np.array([[row[i] for row in normalized_signal] for i in range(0, 3)])
+
+    return normalized
