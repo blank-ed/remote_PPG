@@ -14,4 +14,4 @@ windowed_sig = moving_window(raw_sig)
 
 for y, x in enumerate(windowed_sig):
     normalized = normalize(x)
-    ICA = apply_jade(normalized)
+    # ICA = apply_jade(normalized)
