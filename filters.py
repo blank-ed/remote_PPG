@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import signal
 
 
 def normalize(sig):
@@ -17,3 +18,22 @@ def normalize(sig):
     normalized = np.array([[row[i] for row in normalized_signal] for i in range(0, 3)])
 
     return normalized
+
+
+def bp_filter(sig, fps, low=0.5, high=3.7):
+    """
+    :param sig:
+        Takes in the signal to be filtered
+    :param fps:
+        This is the fps of the video file, which is also the sampling frequency
+    :param low:
+        This is the low frequency level
+    :param high:
+        This is the high frequency level
+    :return:
+        Returns the bandpass filtered signal
+    """
+
+    filtered = signal.firwin(sig, fs=fps, cutoff=[low, high], window='hamming', pass_zero='bandpass')
+
+    return filtered

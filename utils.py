@@ -18,10 +18,14 @@ def extract_frames_yield(input_video):
     vidcap.release()
 
 
-def VJ_face_detector(input_video, width=0.6, height=1):
+def VJ_face_detector(input_video, ROI='BB', width=0.6, height=1):
     """
     :param input_video:
         This takes in an input video file
+    :param ROI:
+        Select the region of interest
+            - BB: Bounding box of the whole face
+            - FH: Forehead box using Viola Jones Face Detector
     :param width:
         Select the width of the detected face bounding box
     :param height:

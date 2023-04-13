@@ -27,6 +27,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12):
     :return:
         Returns the estimated heart rate of the input video based on ICA framework
     """
+
     raw_sig = VJ_face_detector(input_video)  # get the raw RGB signals
     fps = get_fps(input_video)  # find the fps of the video
 
