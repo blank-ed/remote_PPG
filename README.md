@@ -1,5 +1,5 @@
 # Remote Photoplethysmography
-This is my implementations of rPPG algorithms. **_This is still a work in progress_**.
+This is my implementations of the original rPPG frameworks. **_This is still a work in progress_**.
 
 ## Background on rPPG
 RPPG stands for Remote Photoplethysmography, which is a technique that uses video cameras to measure physiological signals, such as the heart rate, from the face of a person. RPPG is a non-contact, non-invasive method that works by detecting tiny changes in skin color caused by the variation of blood volume in the skin vessels.
