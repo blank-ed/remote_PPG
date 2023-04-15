@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import signal
+from scipy.signal import firwin, filtfilt
 
 
 def normalize(sig):
@@ -7,7 +7,7 @@ def normalize(sig):
     :param sig:
         Input signal to normalize to have zero-mean and unit variance
     :return:
-        Normalized signal
+        Normalized signal in [[R] [G] [B]] format
     """
     signal = np.array(sig)
     mean = np.mean(signal, axis=0)
@@ -15,12 +15,11 @@ def normalize(sig):
     normalized_signal = (signal - mean) / std_dev
 
     # Turn normalized signal to [[R] [G] [B]]
-    normalized = np.array([[row[i] for row in normalized_signal] for i in range(0, 3)])
-
+    normalized = np.array([normalized_signal[:, i] for i in range(0, 3)])
     return normalized
 
 
-def bp_filter(sig, fps, low=0.5, high=3.7):
+def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     """
     :param sig:
         Takes in the signal to be filtered
@@ -31,9 +30,18 @@ def bp_filter(sig, fps, low=0.5, high=3.7):
     :param high:
         This is the high frequency level
     :return:
-        Returns the bandpass filtered signal
+        Returns the bandpass filtered signal in [[R] [G] [B]] format
     """
+    signal = np.array(sig)
 
-    filtered = signal.firwin(sig, fs=fps, cutoff=[low, high], window='hamming', pass_zero='bandpass')
+    # Coefficients of FIR bandpass filter
+    filter_coefficients = firwin(numtaps=32, cutoff=[low, high], fs=fps, pass_zero=False, window='hamming')
 
-    return filtered
+    # Filtering using the FIR bandpass filter coefficients.
+    # Since its FIR bandpass filter, the denominator coefficient is set as 1
+    filtered_signal = filtfilt(filter_coefficients, 1, signal, axis=0)
+
+    # Turn filtered signal to [[R] [G] [B]]
+    filtered_signal = np.array([filtered_signal[:, i] for i in range(0, 3)])
+
+    return filtered_signal

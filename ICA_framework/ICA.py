@@ -8,7 +8,7 @@ proposed by them.
 
 from remote_PPG.utils import *
 from remote_PPG.filters import *
-from jadeR import jadeR as jadeR
+from remote_PPG.ICA_framework.jadeR import jadeR as jadeR
 from scipy.fft import rfft, rfftfreq
 from scipy.signal import find_peaks
 

@@ -18,10 +18,12 @@ def extract_frames_yield(input_video):
     vidcap.release()
 
 
-def VJ_face_detector(input_video, ROI='BB', width=0.6, height=1):
+def VJ_face_detector(input_video, framework=None, width=0.6, height=1):
     """
     :param input_video:
         This takes in an input video file
+    :param framework:
+        This is specified for PCA only, since PCA returns the sum of RGB values instead of averaged values
     :param ROI:
         Select the region of interest
             - BB: Bounding box of the whole face
@@ -31,14 +33,24 @@ def VJ_face_detector(input_video, ROI='BB', width=0.6, height=1):
     :param height:
         Select the height of the detected face bounding box
     :return:
-        Returns the raw RGB signal
+        if framework == 'PCA':
+            Returns the sum of RGB pixel values of video sequence from the ROI
+        else:
+            Returns the averaged raw RGB signal from the ROI
     """
 
     raw_sig = []
 
-    face_cascade = cv2.CascadeClassifier(r"C:\Users\ilyas\PycharmProjects\pythonProject1\remote_PPG\Necessary Files\haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier("Necessary Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
+    frame_counter = 0
     for frame in extract_frames_yield(input_video):
+        frame_counter += 1
+
+        # Skip the first second as the camera have auto adjusting properties
+        if frame_counter <= get_fps(input_video):
+            continue
+
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
@@ -59,8 +71,14 @@ def VJ_face_detector(input_video, ROI='BB', width=0.6, height=1):
                 y2 = int(y + (1 + height) / 2 * h)
                 roi = frame[y1:y2, x1:x2]
 
-        b, g, r, a = cv2.mean(roi)
-        raw_sig.append([r, g, b])
+        if framework == 'PCA':
+            red_values = np.sum(roi[:, :, 2], axis=(0, 1))
+            green_values = np.sum(roi[:, :, 1], axis=(0, 1))
+            blue_values = np.sum(roi[:, :, 0], axis=(0, 1))
+            raw_sig.append([red_values, green_values, blue_values])
+        else:
+            b, g, r, a = cv2.mean(roi)
+            raw_sig.append([r, g, b])
 
     return raw_sig
 
