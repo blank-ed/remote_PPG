@@ -2,7 +2,7 @@
 
 This module contains the framework implemented by https://opg.optica.org/oe/fulltext.cfm?uri=oe-18-10-10762&id=199381
 which is also known as ICA rPPG by other research papers. This is the closest implementation of the original framework
-proposed by them.
+that has been proposed.
 
 """
 
