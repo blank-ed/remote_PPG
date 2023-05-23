@@ -11,57 +11,59 @@
 
 import cv2
 
+cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
+video_sequence = []
 
+while True:
+    ret, frame = cap.read()
 
+    if not ret:
+        break
 
+    video_sequence.append(frame)
 
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+print("Total frames in the video sequence:", len(video_sequence))
 
 import cv2
 import numpy as np
 
-# Load the cascade classifier
-face_cascade = cv2.CascadeClassifier("Necessary Files\\haarcascade_frontalface_default.xml")
+def calculate_intensity(image):
+    # calculate the intensity of the image
+    return np.sum(image, axis=2) / 3.0
 
-# Start the video capture
-cap = cv2.VideoCapture(r'C:\Users\Admin\Desktop\Riccardo New Dataset\test_L00_no_ex_riccardo_all_distances\D01.mp4')
+def calculate_motion(images):
+    # calculate the motion between consecutive images
+    motion = []
+    for i in range(0, len(images)):
+        motion.append(np.sum(np.abs(calculate_intensity(images[i]) - calculate_intensity(images[i+1]))))
+    return motion
 
-while True:
-    # Read a frame from the video capture
-    ret, frame = cap.read()
+def find_least_motion_segment(motion, segment_length):
+    # find the segment with the least motion
+    cumulative_motion = np.cumsum(motion)
+    min_motion = np.inf
+    min_index = -1
+    for i in range(segment_length, len(cumulative_motion)):
+        motion_in_segment = cumulative_motion[i] - cumulative_motion[i-segment_length]
+        if motion_in_segment < min_motion:
+            min_motion = motion_in_segment
+            min_index = i - segment_length + 1
+    return min_index
 
-    # Convert the frame to grayscale
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+# calculate motion
+motion = calculate_motion(video_sequence)
 
-    # Detect faces in the grayscale frame
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+print(motion)
+print(len(motion))
 
-    # Apply skin color detection for each face
-    for (x, y, w, h) in faces:
-        roi = frame[y:y+h, x:x+w]
-        hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
-        # Define a lower and upper skin color range in HSV
-        lower_skin = np.array([55, 55, 55], dtype=np.uint8)
-        upper_skin = np.array([255, 255, 255], dtype=np.uint8)
-
-        # Threshold the HSV image to get only skin color
-        mask = cv2.inRange(hsv_roi, lower_skin, upper_skin)
-
-        # Bitwise-AND the mask and original image
-        roi = cv2.bitwise_and(roi, roi, mask=mask)
-
-        # Insert the processed ROI back into the original frame
-        frame[y:y+h, x:x+w] = roi
-
-    # Display the frame with the skin mask
-    cv2.imshow("Skin Detection", frame)
-
-    # Break the loop if the 'q' key is pressed
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
-
-# Release the video capture
-cap.release()
-
-# Close all windows
-cv2.destroyAllWindows()
+# # find the segment with the least motion
+# segment_length = 500
+# i_s = find_least_motion_segment(motion, segment_length)
+#
+# print(f'The segment of {segment_length} consecutive frames starting from frame {i_s} has the least motion.')
