@@ -18,12 +18,13 @@ def extract_frames_yield(input_video):
     vidcap.release()
 
 
-def VJ_face_detector(input_video, framework=None, width=0.6, height=1):
+def VJ_face_detector(input_video, framework=None, width=1, height=1):
     """
     :param input_video:
         This takes in an input video file
     :param framework:
-        This is specified for PCA only, since PCA returns the sum of RGB values instead of averaged values
+        This is to specify the framework. Different frameworks have different ways of using the Viola-Jones
+        face detector.
     :param ROI:
         Select the region of interest
             - BB: Bounding box of the whole face
@@ -35,7 +36,9 @@ def VJ_face_detector(input_video, framework=None, width=0.6, height=1):
     :return:
         if framework == 'PCA':
             Returns the sum of RGB pixel values of video sequence from the ROI
-        else:
+        elif framework == 'CHROM':
+
+        elif framework == 'ICA':
             Returns the averaged raw RGB signal from the ROI
     """
 
@@ -76,7 +79,11 @@ def VJ_face_detector(input_video, framework=None, width=0.6, height=1):
             green_values = np.sum(roi[:, :, 1], axis=(0, 1))
             blue_values = np.sum(roi[:, :, 0], axis=(0, 1))
             raw_sig.append([red_values, green_values, blue_values])
-        else:
+        elif framework == 'CHROM':
+            # Apply simple skin selection thing for now just returning raw rgb values
+            b, g, r, a = cv2.mean(roi)
+            raw_sig.append([r, g, b])
+        elif framework == 'ICA':
             b, g, r, a = cv2.mean(roi)
             raw_sig.append([r, g, b])
 
