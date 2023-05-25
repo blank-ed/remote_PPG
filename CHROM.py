@@ -1,6 +1,6 @@
 # 1) Pick 500 consecutive images exhibiting the smallest amount of inter frame motion (DONE)
 # 2) Apply VJ face detector to define ROI (DONE)
-# 3) Apply simple skin selection process which produces a skin mask inside the ROI that will remove all pixels containing facial hairs and facial features
+# 3) Apply simple skin selection process which produces a skin mask inside the ROI that will remove all pixels containing facial hairs and facial features (DONE 3 ways to do it)
 # 4) Spatial pooling of RGB (DONE)
 # 5) Normalize R, G and B to obtain Rn, Gn and Bn (DONE)
 # 6) Get Xs = 3Rn - 2Gn and Ys = 1.5Rn + Gn - 1.5Bn (DONE)
@@ -8,6 +8,8 @@
 # 8) Find alpha by dividing standard deviation of Xf and standard deviation of Yf (DONE)
 # 9) Find S = Xf - alpha*Yf
 # 10)
+from matplotlib import pyplot as plt
+from scipy.signal import medfilt
 
 from remote_PPG.filters import normalize
 import numpy as np
@@ -95,3 +97,225 @@ import matplotlib.pyplot as plt
 plt.plot(S)
 
 plt.show()
+
+
+
+
+
+
+
+# pixel filtering italian paper
+
+# import cv2
+#
+# from remote_PPG.utils import VJ_face_detector
+#
+# cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
+# video_sequence = []
+#
+# while True:
+#     ret, frame = cap.read()
+#
+#     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
+#
+#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+#     width = 1
+#     height = 1
+#     if len(faces) == 0 and face_coordinates_prev is not None:
+#         x, y, w, h = face_coordinates_prev
+#         x1 = int(x + (1 - width) / 2 * w)
+#         y1 = int(y + (1 - height) / 2 * h)
+#         x2 = int(x + (1 + width) / 2 * w)
+#         y2 = int(y + (1 + height) / 2 * h)
+#         roi = frame[y1:y2, x1:x2]
+#
+#     else:
+#         for (x, y, w, h) in faces:
+#             face_coordinates_prev = (x, y, w, h)
+#             x1 = int(x + (1 - width) / 2 * w)
+#             y1 = int(y + (1 - height) / 2 * h)
+#             x2 = int(x + (1 + width) / 2 * w)
+#             y2 = int(y + (1 + height) / 2 * h)
+#             roi = frame[y1:y2, x1:x2]
+#
+#     # Find the indices where conditions are met
+#     lower_than_55 = np.any(roi < 75, axis=-1)
+#     greater_than_200 = np.any(roi > 200, axis=-1)
+#
+#     # Combine these indices
+#     indices = np.logical_or(lower_than_55, greater_than_200)
+#
+#     # Create a copy of the image to not overwrite the original one
+#     img_copy = roi.copy()
+#
+#     # Change these pixels to black
+#     img_copy[indices] = 0
+#     cv2.imshow('filter', img_copy)
+#     cv2.imshow('frame', roi)
+#
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+#
+# cap.release()
+# cv2.destroyAllWindows()
+
+# #SKIN MASK USING HSV
+#
+# import cv2
+#
+# from remote_PPG.utils import VJ_face_detector
+#
+# cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
+# video_sequence = []
+#
+# while True:
+#     ret, frame = cap.read()
+#
+#     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
+#
+#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+#     width = 1
+#     height = 1
+#     if len(faces) == 0 and face_coordinates_prev is not None:
+#         x, y, w, h = face_coordinates_prev
+#         x1 = int(x + (1 - width) / 2 * w)
+#         y1 = int(y + (1 - height) / 2 * h)
+#         x2 = int(x + (1 + width) / 2 * w)
+#         y2 = int(y + (1 + height) / 2 * h)
+#         roi = frame[y1:y2, x1:x2]
+#
+#     else:
+#         for (x, y, w, h) in faces:
+#             face_coordinates_prev = (x, y, w, h)
+#             x1 = int(x + (1 - width) / 2 * w)
+#             y1 = int(y + (1 - height) / 2 * h)
+#             x2 = int(x + (1 + width) / 2 * w)
+#             y2 = int(y + (1 + height) / 2 * h)
+#             roi = frame[y1:y2, x1:x2]
+#
+#     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+#
+#     # Split HSV image into H, S and V channels
+#     h, s, v = cv2.split(hsv)
+#
+#     # Calculate histogram of S channelq
+#     histogram = cv2.calcHist([s], [0], None, [256], [0, 256])
+#     saturation = [x[0] for x in histogram]
+#     filtered_data = medfilt(saturation, kernel_size=5).tolist()
+#     hist_max = filtered_data.index(max(filtered_data))
+#     alpha = 0.5
+#     TH_range = alpha*hist_max
+#     TH_max = hist_max + TH_range/2.0
+#     TH_min = hist_max - TH_range / 2.0
+#
+#     # create a boolean mask where saturation value is between TH_min and TH_max
+#     mask = cv2.inRange(s, TH_min, TH_max)
+#
+#     # apply the mask to the original image
+#     selected_pixels = cv2.bitwise_and(roi, roi, mask=mask)
+#
+#     cv2.imshow('selected', selected_pixels)
+#
+#
+#
+#
+#     # print(max(filtered_data), hist_max)
+#     #
+#     # # Plot histogram
+#     # plt.figure()
+#     # plt.title("Saturation Histogram")
+#     # plt.xlabel("Bins")
+#     # plt.ylabel("# of Pixels")
+#     # plt.plot(filtered_data)
+#     # plt.axvline(hist_max, color='red')
+#     # plt.axvline(TH_max, color='red')
+#     # plt.axvline(TH_min, color='red')
+#     # plt.xlim([0, 256])
+#     # plt.show()
+#
+#     cv2.imshow('roi', roi)
+#     cv2.imshow('frame', frame)
+#
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+#
+# cap.release()
+# cv2.destroyAllWindows()
+
+# Face segmentation
+
+# import cv2
+# import numpy as np
+# import torch
+# from torchvision import transforms
+# from Necessary_Files.face_parsing.model import BiSeNet
+#
+# net = BiSeNet(n_classes=19)
+# net.load_state_dict(torch.load('Necessary_Files\\79999_iter.pth', map_location='cpu'))
+# net.eval()
+# to_tensor = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
+#
+# transform = transforms.Compose([transforms.Resize((512, 512)), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+#
+# cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
+# video_sequence = []
+#
+# while True:
+#     ret, frame = cap.read()
+#
+#     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
+#
+#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+#     width = 1
+#     height = 1
+#     if len(faces) == 0 and face_coordinates_prev is not None:
+#         x, y, w, h = face_coordinates_prev
+#         x1 = int(x + (1 - width) / 2 * w)
+#         y1 = int(y + (1 - height) / 2 * h)
+#         x2 = int(x + (1 + width) / 2 * w)
+#         y2 = int(y + (1 + height) / 2 * h)
+#         roi = frame[y1:y2, x1:x2]
+#
+#     else:
+#         for (x, y, w, h) in faces:
+#             face_coordinates_prev = (x, y, w, h)
+#             x1 = int(x + (1 - width) / 2 * w)
+#             y1 = int(y + (1 - height) / 2 * h)
+#             x2 = int(x + (1 + width) / 2 * w)
+#             y2 = int(y + (1 + height) / 2 * h)
+#             roi = frame[y1:y2, x1:x2]
+#
+#     image = cv2.resize(roi, (512, 512), interpolation=cv2.INTER_LINEAR)
+#     img = to_tensor(image)
+#     img = torch.unsqueeze(img, 0)
+#     out = net(img)[0]
+#     out = out.squeeze().argmax(0).detach().cpu().numpy()
+#
+#     # Create the masks for classes 0 and 10.
+#     mask_0 = np.where(out == 1, 255, 0).astype('uint8')
+#     mask_10 = np.where(out == 10, 255, 0).astype('uint8')
+#
+#     # Combine the masks.
+#     mask_combined = np.where((mask_0 == 255) | (mask_10 == 255), 255, 0).astype('uint8')
+#
+#     # Apply the combined mask to the original frame.
+#     face = cv2.bitwise_and(image, image, mask=mask_combined)
+#
+#     # Get the original ROI size.
+#     original_size = roi.shape[:2]
+#
+#     # Resize the face image back to the original ROI size.
+#     face_resized = cv2.resize(face, (original_size[1], original_size[0]))
+#
+#     # Display the result.
+#     cv2.imshow('Face', face_resized)
+#     cv2.imshow('frame', roi)
+#
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+#
+# cap.release()
+# cv2.destroyAllWindows()

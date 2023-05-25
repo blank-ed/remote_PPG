@@ -44,7 +44,7 @@ def VJ_face_detector(input_video, framework=None, width=1, height=1):
 
     raw_sig = []
 
-    face_cascade = cv2.CascadeClassifier("Necessary Files\\haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
     frame_counter = 0
     for frame in extract_frames_yield(input_video):
