@@ -2,6 +2,8 @@
 
 import cv2
 import numpy as np
+from remote_PPG.filters import *
+
 
 def extract_frames_yield(input_video):
     """
@@ -10,15 +12,16 @@ def extract_frames_yield(input_video):
     return:
         Yields the frames
     """
-    vidcap = cv2.VideoCapture(input_video)
-    success, image = vidcap.read()
+
+    cap = cv2.VideoCapture(input_video)
+    success, image = cap.read()
     while success:
         yield image
-        success, image = vidcap.read()
-    vidcap.release()
+        success, image = cap.read()
+    cap.release()
 
 
-def VJ_face_detector(input_video, framework=None, width=1, height=1):
+def vj_face_detector(input_video, framework=None, width=1, height=1):
     """
     :param input_video:
         This takes in an input video file
@@ -80,8 +83,8 @@ def VJ_face_detector(input_video, framework=None, width=1, height=1):
             blue_values = np.sum(roi[:, :, 0], axis=(0, 1))
             raw_sig.append([red_values, green_values, blue_values])
         elif framework == 'CHROM':
-            # Apply simple skin selection thing for now just returning raw rgb values
-            b, g, r, a = cv2.mean(roi)
+            filtered_roi = simple_skin_selection(roi)
+            b, g, r, a = cv2.mean(filtered_roi)
             raw_sig.append([r, g, b])
         elif framework == 'ICA':
             b, g, r, a = cv2.mean(roi)
@@ -103,6 +106,7 @@ def moving_window(sig, fps, window_size, increment):
     :return:
         returns the windowed signal
     """
+
     windowed_sig = []
     for i in range(0, len(sig), increment * fps):
         end = i + window_size * fps
@@ -110,6 +114,7 @@ def moving_window(sig, fps, window_size, increment):
             windowed_sig.append(sig[len(sig) - window_size * fps:len(sig)])
             break
         windowed_sig.append(sig[i:end])
+
     return windowed_sig
 
 
@@ -120,8 +125,9 @@ def get_fps(input_video):
     :return:
         Returns the fps of the video
     """
-    vidcap = cv2.VideoCapture(input_video)
-    fps = vidcap.get(cv2.CAP_PROP_FPS)
-    vidcap.release()
-    return int(fps)
 
+    cap = cv2.VideoCapture(input_video)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+
+    return int(fps)

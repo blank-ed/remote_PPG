@@ -41,7 +41,29 @@ def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     # Since its FIR bandpass filter, the denominator coefficient is set as 1
     filtered_signal = filtfilt(filter_coefficients, 1, signal, axis=0)
 
-    # Turn filtered signal to [[R] [G] [B]]
-    filtered_signal = np.array([filtered_signal[:, i] for i in range(0, 3)])
-
     return filtered_signal
+
+
+def simple_skin_selection(frame, lower_rgb=75, higher_rgb=200):
+    """
+    :param frame:
+        Input frames of video
+    :param lower_rgb:
+        Lower RGB threshold level
+    :param higher_rgb:
+        Higher RGB threshold level
+    :return:
+        Returns filtered pixels that lies between given RGB threshold
+    """
+    lower_rgb_threshold = np.any(frame < lower_rgb, axis=-1)
+    higher_rgb_threshold = np.any(frame > higher_rgb, axis=-1)
+    # Combine these indices
+    indices = np.logical_or(lower_rgb_threshold, higher_rgb_threshold)
+
+    # Create a copy of the image to not overwrite the original one
+    img_copy = frame.copy()
+    # Change these pixels to black
+    img_copy[indices] = 0
+
+    return img_copy
+

@@ -14,6 +14,8 @@ raw_sig = [[8778862, 6561505, 6608951], [8866351, 6626356, 6671189], [8981900, 6
 fps = 30
 
 filtered = fir_bp_filter(sig=raw_sig, fps=fps)
+# Turn filtered signal to [[R] [G] [B]]
+filtered = np.array([filtered[:, i] for i in range(0, 3)])
 
 pca = PCA(n_components=3)
 pca.fit(filtered)
