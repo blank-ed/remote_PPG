@@ -4,22 +4,23 @@
 # 4) Spatial pooling of RGB (DONE)
 # 5) Normalize R, G and B to obtain Rn, Gn and Bn (DONE)
 # 6) Get Xs = 3Rn - 2Gn and Ys = 1.5Rn + Gn - 1.5Bn (DONE)
-# 7) Bandpass filter Xs and Ys to get Xf and
+# 7) Bandpass filter Xs and Ys to get Xf and (DONE)
 # 8) Find alpha by dividing standard deviation of Xf and standard deviation of Yf (DONE)
 # 9) Find S = Xf - alpha*Yf (DONE)
 # 10)
 
 """
 
-This module contains the framework implemented by https://ieeexplore.ieee.org/document/6523142 which is also known as
-CROM rPPG by other research papers. This is the closest implementation of the original framework that has been proposed.
+This module contains the framework implemented by https://ieeexplore.ieee.org/document/6523142 which is
+also known as CHROM rPPG by other research papers. This is the closest implementation of the original
+framework that has been proposed.
 
 """
 
 from remote_PPG.utils import *
 
 from matplotlib import pyplot as plt
-from scipy.signal import medfilt
+from scipy.signal import medfilt, find_peaks
 from remote_PPG.filters import normalize
 import numpy as np
 
@@ -101,93 +102,35 @@ Yf = fir_bp_filter(sig=Ys, fps=30, low=0.67, high=4.0)
 alpha = np.std(Xf) / np.std(Yf)
 S = Xf - alpha * Yf
 
+import numpy as np
+from scipy import signal
+from scipy.fft import rfft, rfftfreq
+import matplotlib.pyplot as plt
 
+L = 32
+
+window = signal.windows.hann(L)
+windowed_sig = moving_window(sig=S, fps=30, window_size=L/30, increment=int(L/2)/30)
+windowed_S = window*windowed_sig
+
+peak_frequencies = []
+
+for x in windowed_S:
+    fft_result = rfft(x)
+    fft_abs = np.abs(fft_result)
+    peak_index, _ = find_peaks(fft_abs, distance=1)  # Distance parameter can be adjusted as per requirement
+
+    # Get the frequency for each FFT point
+    frequencies = rfftfreq(len(x), d=1 / 30)  # This gives the frequency for each FFT point
+
+    # Append the peak frequency to the list
+    peak_frequencies.append(frequencies[peak_index[0]])  # Taking the first peak
+
+# Convert frequencies in Hz to BPM
+peak_frequencies_bpm = [freq * 60 for freq in peak_frequencies]
+print(peak_frequencies_bpm)
 ### END TEST SECTION
 
-
-# #SKIN MASK USING HSV
-#
-# import cv2
-#
-# from remote_PPG.utils import VJ_face_detector
-#
-# cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
-# video_sequence = []
-#
-# while True:
-#     ret, frame = cap.read()
-#
-#     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
-#
-#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-#     width = 1
-#     height = 1
-#     if len(faces) == 0 and face_coordinates_prev is not None:
-#         x, y, w, h = face_coordinates_prev
-#         x1 = int(x + (1 - width) / 2 * w)
-#         y1 = int(y + (1 - height) / 2 * h)
-#         x2 = int(x + (1 + width) / 2 * w)
-#         y2 = int(y + (1 + height) / 2 * h)
-#         roi = frame[y1:y2, x1:x2]
-#
-#     else:
-#         for (x, y, w, h) in faces:
-#             face_coordinates_prev = (x, y, w, h)
-#             x1 = int(x + (1 - width) / 2 * w)
-#             y1 = int(y + (1 - height) / 2 * h)
-#             x2 = int(x + (1 + width) / 2 * w)
-#             y2 = int(y + (1 + height) / 2 * h)
-#             roi = frame[y1:y2, x1:x2]
-#
-#     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-#
-#     # Split HSV image into H, S and V channels
-#     h, s, v = cv2.split(hsv)
-#
-#     # Calculate histogram of S channelq
-#     histogram = cv2.calcHist([s], [0], None, [256], [0, 256])
-#     saturation = [x[0] for x in histogram]
-#     filtered_data = medfilt(saturation, kernel_size=5).tolist()
-#     hist_max = filtered_data.index(max(filtered_data))
-#     alpha = 0.5
-#     TH_range = alpha*hist_max
-#     TH_max = hist_max + TH_range/2.0
-#     TH_min = hist_max - TH_range / 2.0
-#
-#     # create a boolean mask where saturation value is between TH_min and TH_max
-#     mask = cv2.inRange(s, TH_min, TH_max)
-#
-#     # apply the mask to the original image
-#     selected_pixels = cv2.bitwise_and(roi, roi, mask=mask)
-#
-#     cv2.imshow('selected', selected_pixels)
-#
-#
-#
-#
-#     # print(max(filtered_data), hist_max)
-#     #
-#     # # Plot histogram
-#     # plt.figure()
-#     # plt.title("Saturation Histogram")
-#     # plt.xlabel("Bins")
-#     # plt.ylabel("# of Pixels")
-#     # plt.plot(filtered_data)
-#     # plt.axvline(hist_max, color='red')
-#     # plt.axvline(TH_max, color='red')
-#     # plt.axvline(TH_min, color='red')
-#     # plt.xlim([0, 256])
-#     # plt.show()
-#
-#     cv2.imshow('roi', roi)
-#     cv2.imshow('frame', frame)
-#
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
-#
-# cap.release()
-# cv2.destroyAllWindows()
 
 # Face segmentation
 

@@ -17,34 +17,62 @@ filtered = fir_bp_filter(sig=raw_sig, fps=fps)
 # Turn filtered signal to [[R] [G] [B]]
 filtered = np.array([filtered[:, i] for i in range(0, 3)])
 
-pca = PCA(n_components=3)
+pca = PCA(n_components=2)
 pca.fit(filtered)
 
 bvp = np.array([pca.components_[i] * pca.explained_variance_[i] for i in range(0, 3)])
 
-def calculate_mean_hr_zero_crossings(pc, fps):
-    # Calculate the zero-crossings
-    slope = np.diff(pc)
-    zero_crossing_indices = np.where(np.diff(np.sign(slope)) > 0)[0]
-    time_intervals = np.diff(zero_crossing_indices) / fps
-    heart_rates_method1 = 60 / time_intervals
-    mean_heart_rate_method1 = np.mean(heart_rates_method1)
+print(pca.explained_variance_ratio_)
 
-    return mean_heart_rate_method1
+# def calculate_mean_hr_zero_crossings(pc, fps):
+#     # Calculate the zero-crossings
+#     slope = np.diff(pc)
+#     zero_crossing_indices = np.where(np.diff(np.sign(slope)) > 0)[0]
+#     time_intervals = np.diff(zero_crossing_indices) / fps
+#     heart_rates_method1 = 60 / time_intervals
+#     mean_heart_rate_method1 = np.mean(heart_rates_method1)
+#
+#     return mean_heart_rate_method1
+#
+# mean_hr_zero_crossings = calculate_mean_hr_zero_crossings(bvp[1], fps)
+# print("Mean heart rate (zero-crossings method):", mean_hr_zero_crossings)
+# from scipy.signal import welch
+# import scipy.signal
+#
+# def calculate_mean_hr_psd(pc, fps):
+#     # Calculate the power spectral density
+#     frequencies, power_density = welch(pc, fs=fps)
+#     max_power_index = np.argmax(power_density)
+#     peak_frequency = frequencies[max_power_index]
+#     mean_heart_rate_method2 = peak_frequency * 60
+#
+#     return mean_heart_rate_method2
+#
+# mean_hr_psd = calculate_mean_hr_psd(bvp[1], fps)
+# print("Mean heart rate (power spectral density method):", mean_hr_psd)
 
-mean_hr_zero_crossings = calculate_mean_hr_zero_crossings(bvp[1], fps)
-print("Mean heart rate (zero-crossings method):", mean_hr_zero_crossings)
-from scipy.signal import welch
-import scipy.signal
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
 
-def calculate_mean_hr_psd(pc, fps):
-    # Calculate the power spectral density
-    frequencies, power_density = welch(pc, fs=fps)
-    max_power_index = np.argmax(power_density)
-    peak_frequency = frequencies[max_power_index]
-    mean_heart_rate_method2 = peak_frequency * 60
+data = pd.read_excel("E:\data\Desk_TVOC_Orientation.xlsx")  # CHANGE
+df = []
+for i in range(1, 6):
+    df.append(data["Average_TVOC_Pi" + str(i) + "_CF"].tolist())  # CHANGE
 
-    return mean_heart_rate_method2
+# # It's a good practice to standardize the features to have mean=0 and variance=1
+scaler = StandardScaler()
+df_scaled = scaler.fit_transform(df)
 
-mean_hr_psd = calculate_mean_hr_psd(bvp[1], fps)
-print("Mean heart rate (power spectral density method):", mean_hr_psd)
+# Create a PCA instance
+pca = PCA(n_components=3)  # CHANGE
+principalComponents = pca.fit_transform(df)
+
+# You can convert the principal components to a dataframe:
+principalDf = pd.DataFrame(data = principalComponents, columns = ['principal component 1', 'principal component 2', 'principal component 3'])  # CHANGE
+
+print(principalDf)  # This will print the variance strength based on the ratio
+
+# The explained variance tells you how much information (variance) can be attributed to each of the principal components
+print('Explained variance: ', pca.explained_variance_ratio_)  # This will print the ratio
+print('Explained variance (%): ', pca.explained_variance_ratio_*100)

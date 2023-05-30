@@ -3,6 +3,8 @@
 import cv2
 import numpy as np
 from remote_PPG.filters import *
+import mediapipe as mp
+from mediapipe.tasks.python import vision, BaseOptions
 
 
 def extract_frames_yield(input_video):
@@ -89,8 +91,58 @@ def vj_face_detector(input_video, framework=None, width=1, height=1):
         elif framework == 'ICA':
             b, g, r, a = cv2.mean(roi)
             raw_sig.append([r, g, b])
+        elif framework == 'LiCVPR':
+            b, g, r, a = cv2.mean(roi)
+            raw_sig.append(g)
 
     return raw_sig
+
+
+def raw_bg_signal(input_video):
+    """
+    :param input_video:
+        This takes in an input video file
+    :return:
+        Returns the mean RGB value of the background
+    """
+
+    raw_bg_sig = []
+
+    model_path = 'Necessary_Files\\selfie_segmenter_landscape.tflite'
+    base_options = BaseOptions(model_asset_path=model_path)
+
+    mp_base_options = mp.tasks.BaseOptions
+    ImageSegmenter = mp.tasks.vision.ImageSegmenter
+    ImageSegmenterOptions = mp.tasks.vision.ImageSegmenterOptions
+    VisionRunningMode = mp.tasks.vision.RunningMode
+
+    # Create an image segmenter instance with the video mode:
+    options = ImageSegmenterOptions(base_options=mp_base_options(model_asset_path=model_path),
+                                    running_mode=VisionRunningMode.VIDEO, output_category_mask=True)
+
+    frame_counter = 0
+    fps = get_fps(input_video)
+
+    with ImageSegmenter.create_from_options(options) as segmenter:
+        for frame in extract_frames_yield(input_video):
+            frame_time = int(frame_counter * (1000 / fps))
+
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
+            segmented_masks = segmenter.segment_for_video(mp_image, frame_time)
+            category_mask = segmented_masks.category_mask
+            output = category_mask.numpy_view()
+
+            output_mask_bool = np.where(output == 255, True, False)
+            output_frame = np.zeros_like(frame)
+            output_frame[output_mask_bool] = frame[output_mask_bool]
+
+            output_mask_uint8 = output_mask_bool.astype(np.uint8)
+            b, g, r, a = cv2.mean(frame, mask=output_mask_uint8)
+            raw_bg_sig.append([r, g, b])
+
+            frame_counter += 1
+
+    return raw_bg_sig
 
 
 def moving_window(sig, fps, window_size, increment):
@@ -108,10 +160,10 @@ def moving_window(sig, fps, window_size, increment):
     """
 
     windowed_sig = []
-    for i in range(0, len(sig), increment * fps):
-        end = i + window_size * fps
+    for i in range(0, len(sig), int(increment * fps)):
+        end = i + int(window_size * fps)
         if end >= len(sig):
-            windowed_sig.append(sig[len(sig) - window_size * fps:len(sig)])
+            windowed_sig.append(sig[len(sig) - int(window_size * fps):len(sig)])
             break
         windowed_sig.append(sig[i:end])
 
@@ -131,3 +183,4 @@ def get_fps(input_video):
     cap.release()
 
     return int(fps)
+

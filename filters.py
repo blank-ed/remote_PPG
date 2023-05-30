@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.signal import firwin, filtfilt
+from scipy.signal import firwin, filtfilt, medfilt
+import cv2
 
 
 def normalize(sig):
@@ -44,6 +45,42 @@ def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     return filtered_signal
 
 
+def detrending_filter(signal, Lambda):
+    """
+    applies a detrending filter.
+
+    This code is based on the following article "An advanced detrending method with application
+    to HRV analysis". Tarvainen et al., IEEE Trans on Biomedical Engineering, 2002.
+
+      Parameters
+      ----------
+      signal: numpy.ndarray
+        The signal where you want to remove the trend.
+      Lambda: int
+        The smoothing parameter.
+
+      Returns
+      -------
+      filtered_signal: numpy.ndarray
+        The detrended signal.
+
+      """
+    signal_length = signal.shape[0]
+
+    # observation matrix
+    H = np.identity(signal_length)
+
+    # second-order difference matrix
+    from scipy.sparse import spdiags
+    ones = np.ones(signal_length)
+    minus_twos = -2 * np.ones(signal_length)
+    diags_data = np.array([ones, minus_twos, ones])
+    diags_index = np.array([0, 1, 2])
+    D = spdiags(diags_data, diags_index, (signal_length - 2), signal_length).toarray()
+    filtered_signal = np.dot((H - np.linalg.inv(H + (Lambda ** 2) * np.dot(D.T, D))), signal)
+    return filtered_signal
+
+
 def simple_skin_selection(frame, lower_rgb=75, higher_rgb=200):
     """
     :param frame:
@@ -55,15 +92,48 @@ def simple_skin_selection(frame, lower_rgb=75, higher_rgb=200):
     :return:
         Returns filtered pixels that lies between given RGB threshold
     """
-    lower_rgb_threshold = np.any(frame < lower_rgb, axis=-1)
-    higher_rgb_threshold = np.any(frame > higher_rgb, axis=-1)
-    # Combine these indices
-    indices = np.logical_or(lower_rgb_threshold, higher_rgb_threshold)
+    lower_rgb_threshold = np.any(frame < lower_rgb, axis=-1)  # Lower RGB threshold
+    higher_rgb_threshold = np.any(frame > higher_rgb, axis=-1)  # Higher RGB threshold
+    indices = np.logical_or(lower_rgb_threshold, higher_rgb_threshold) # Combine these indices
 
-    # Create a copy of the image to not overwrite the original one
-    img_copy = frame.copy()
-    # Change these pixels to black
-    img_copy[indices] = 0
+    img_copy = frame.copy()  # Create a copy of the image to not overwrite the original one
+    img_copy[indices] = 0  # Change these pixels to black
 
     return img_copy
 
+
+def hsv_skin_selection(frame, alpha=0.2, filter_length=5):
+    """
+    This HSV skin selection algorithm is based on Lee, H., Ko, H., Chung, H., Nam, Y., Hong, S. and Lee, J., 2022.
+    Real-time realizable mobile imaging photoplethysmography. Scientific Reports, 12(1), p.7141 which is available at
+    https://www.nature.com/articles/s41598-022-11265-x
+    """
+
+    """
+    :param frame:
+        Input frames of video
+    :param alpha:
+        Constant alpha used to adjust the skin extraction regions
+    :param filter_length:
+        Median filter length
+    :return:
+        Returns
+    """
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # Convert BGR to HSV
+    h, s, v = cv2.split(hsv)  # Split HSV image into H, S and V channels
+    histogram = cv2.calcHist([s], [0], None, [256], [0, 256])  # Calculate histogram of S channel
+    saturation = [x[0] for x in histogram]
+
+    filtered_data = medfilt(saturation, kernel_size=filter_length).tolist()  # Filter using median filter of length 5
+    hist_max = filtered_data.index(max(filtered_data))  # Find the frequent saturation value
+
+    # Calculate the threshold range based on alpha and maximum/frequent saturation value
+    TH_range = alpha * hist_max
+    TH_max = hist_max + TH_range / 2.0
+    TH_min = hist_max - TH_range / 2.0
+
+    mask = cv2.inRange(s, TH_min, TH_max)  # create a boolean mask where saturation value is between TH_min and TH_max
+
+    selected_pixels = cv2.bitwise_and(frame, frame, mask=mask)  # apply the mask to the original image
+
+    return selected_pixels
