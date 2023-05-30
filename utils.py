@@ -51,13 +51,7 @@ def vj_face_detector(input_video, framework=None, width=1, height=1):
 
     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
-    frame_counter = 0
     for frame in extract_frames_yield(input_video):
-        frame_counter += 1
-
-        # Skip the first second as the camera have auto adjusting properties
-        if frame_counter <= get_fps(input_video):
-            continue
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
@@ -98,10 +92,13 @@ def vj_face_detector(input_video, framework=None, width=1, height=1):
     return raw_sig
 
 
-def raw_bg_signal(input_video):
+def raw_bg_signal(input_video, color='g'):
     """
     :param input_video:
         This takes in an input video file
+    :param color:
+        Select the background color channel to return.
+        Default is green
     :return:
         Returns the mean RGB value of the background
     """
@@ -141,6 +138,9 @@ def raw_bg_signal(input_video):
             raw_bg_sig.append([r, g, b])
 
             frame_counter += 1
+
+    if color == 'g':
+        raw_bg_sig = [x[1] for x in raw_bg_sig]
 
     return raw_bg_sig
 

@@ -23,7 +23,7 @@ def normalize(sig):
 def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     """
     :param sig:
-        Takes in the signal to be filtered
+        Takes in the signal to be bandpass filtered
     :param fps:
         This is the fps of the video file, which is also the sampling frequency
     :param low:
@@ -45,26 +45,19 @@ def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     return filtered_signal
 
 
-def detrending_filter(signal, Lambda):
+def detrending_filter(signal, Lambda=300):
     """
-    applies a detrending filter.
+    This code is based on the following article "An advanced detrending method with application to HRV analysis".
+    Tarvainen et al., IEEE Trans on Biomedical Engineering, 2002 and is taken from bob.rppg.base
 
-    This code is based on the following article "An advanced detrending method with application
-    to HRV analysis". Tarvainen et al., IEEE Trans on Biomedical Engineering, 2002.
-
-      Parameters
-      ----------
-      signal: numpy.ndarray
+    :param signal: numpy.ndarray
         The signal where you want to remove the trend.
-      Lambda: int
+    :param Lambda: int
         The smoothing parameter.
-
-      Returns
-      -------
-      filtered_signal: numpy.ndarray
+    :return filtered_signal: numpy.ndarray
         The detrended signal.
+    """
 
-      """
     signal_length = signal.shape[0]
 
     # observation matrix
@@ -79,6 +72,23 @@ def detrending_filter(signal, Lambda):
     D = spdiags(diags_data, diags_index, (signal_length - 2), signal_length).toarray()
     filtered_signal = np.dot((H - np.linalg.inv(H + (Lambda ** 2) * np.dot(D.T, D))), signal)
     return filtered_signal
+
+
+def moving_average_filter(signal, window_size):
+    """
+    :param signal:
+         Takes in the signal to perform moving average filter on
+    :param window_size:
+        Window size to perform moving average (number of frames)
+    :return:
+        Returns moving average filtered signal
+    """
+
+    moving_averages = []
+    for i in range(len(signal) - window_size + 1):
+        moving_averages.append(sum(signal[i:i+window_size])/window_size)
+
+    return moving_averages
 
 
 def simple_skin_selection(frame, lower_rgb=75, higher_rgb=200):
@@ -107,9 +117,7 @@ def hsv_skin_selection(frame, alpha=0.2, filter_length=5):
     This HSV skin selection algorithm is based on Lee, H., Ko, H., Chung, H., Nam, Y., Hong, S. and Lee, J., 2022.
     Real-time realizable mobile imaging photoplethysmography. Scientific Reports, 12(1), p.7141 which is available at
     https://www.nature.com/articles/s41598-022-11265-x
-    """
 
-    """
     :param frame:
         Input frames of video
     :param alpha:
@@ -117,8 +125,10 @@ def hsv_skin_selection(frame, alpha=0.2, filter_length=5):
     :param filter_length:
         Median filter length
     :return:
-        Returns
+        Returns filtered skin pixels
     """
+
+
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # Convert BGR to HSV
     h, s, v = cv2.split(hsv)  # Split HSV image into H, S and V channels
     histogram = cv2.calcHist([s], [0], None, [256], [0, 256])  # Calculate histogram of S channel
