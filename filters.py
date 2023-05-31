@@ -1,16 +1,16 @@
 import numpy as np
-from scipy.signal import firwin, filtfilt, medfilt
+from scipy.signal import firwin, filtfilt, medfilt, butter
 import cv2
 
 
-def normalize(sig):
+def normalize(signal):
     """
-    :param sig:
+    :param signal:
         Input signal to normalize to have zero-mean and unit variance
     :return:
         Normalized signal in [[R] [G] [B]] format
     """
-    signal = np.array(sig)
+    signal = np.array(signal)
     mean = np.mean(signal, axis=0)
     std_dev = np.std(signal, axis=0)
     normalized_signal = (signal - mean) / std_dev
@@ -20,9 +20,9 @@ def normalize(sig):
     return normalized
 
 
-def fir_bp_filter(sig, fps, low=0.5, high=3.7):
+def fir_bp_filter(signal, fps, low=0.5, high=3.7):
     """
-    :param sig:
+    :param signal:
         Takes in the signal to be bandpass filtered
     :param fps:
         This is the fps of the video file, which is also the sampling frequency
@@ -33,7 +33,7 @@ def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     :return:
         Returns the bandpass filtered signal in [[R] [G] [B]] format
     """
-    signal = np.array(sig)
+    signal = np.array(signal)
 
     # Coefficients of FIR bandpass filter
     filter_coefficients = firwin(numtaps=32, cutoff=[low, high], fs=fps, pass_zero=False, window='hamming')
@@ -41,6 +41,33 @@ def fir_bp_filter(sig, fps, low=0.5, high=3.7):
     # Filtering using the FIR bandpass filter coefficients.
     # Since its FIR bandpass filter, the denominator coefficient is set as 1
     filtered_signal = filtfilt(filter_coefficients, 1, signal, axis=0)
+
+    return filtered_signal
+
+
+def butterworth_bp_filter(signal, fps, low=0.5, high=3.7, order=4):
+    """
+    :param signal:
+        Takes in the signal to be bandpass filtered using butterworth
+    :param fps:
+        This is the fps of the video file, which is also the sampling frequency
+    :param low:
+        This is the low frequency level
+    :param high:
+        This is the high frequency level
+    :param order:
+        Filter order
+    :return:
+        Returns the bandpass filtered signal
+    """
+
+    signal = np.array(signal)
+
+    # Coefficients of butterworth bandpass filter
+    b, a = butter(order, Wn=[low, high], fs=fps, btype='bandpass')
+
+    # Filtering using the butterworth bandpass filter coefficients
+    filtered_signal = filtfilt(b, a, signal)
 
     return filtered_signal
 

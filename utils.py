@@ -23,13 +23,12 @@ def extract_frames_yield(input_video):
     cap.release()
 
 
-def vj_face_detector(input_video, framework=None, width=1, height=1):
+def extract_raw_sig(input_video, framework=None, width=1, height=1):
     """
     :param input_video:
         This takes in an input video file
     :param framework:
-        This is to specify the framework. Different frameworks have different ways of using the Viola-Jones
-        face detector.
+        This is to specify the framework. Different frameworks have different ways of extracting raw RGB signal
     :param ROI:
         Select the region of interest
             - BB: Bounding box of the whole face
@@ -88,11 +87,21 @@ def vj_face_detector(input_video, framework=None, width=1, height=1):
         elif framework == 'LiCVPR':
             b, g, r, a = cv2.mean(roi)
             raw_sig.append(g)
+        elif framework == 'GREEN':
+            h, w, _ = frame.shape
+            x1 = int(w * 0.01)
+            y1 = int(h * 0.06)
+            x2 = int(w * 0.96)
+            y2 = int(h * 0.98)
+            roi = frame[y1:y2, x1:x2]
+
+            b, g, r, a = cv2.mean(roi)
+            raw_sig.append(g)
 
     return raw_sig
 
 
-def raw_bg_signal(input_video, color='g'):
+def extract_raw_bg_signal(input_video, color='g'):
     """
     :param input_video:
         This takes in an input video file

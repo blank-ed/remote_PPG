@@ -1,6 +1,6 @@
 # 1) Pick 500 consecutive images exhibiting the smallest amount of inter frame motion (DONE)
 # 2) Apply VJ face detector to define ROI (DONE)
-# 3) Apply simple skin selection process which produces a skin mask inside the ROI that will remove all pixels containing facial hairs and facial features (DONE 3 ways to do it)
+# 3) Apply simple skin selection process which produces a skin mask inside the ROI that will remove all pixels containing facial hairs and facial features (DONE)
 # 4) Spatial pooling of RGB (DONE)
 # 5) Normalize R, G and B to obtain Rn, Gn and Bn (DONE)
 # 6) Get Xs = 3Rn - 2Gn and Ys = 1.5Rn + Gn - 1.5Bn (DONE)
@@ -39,7 +39,7 @@ def chrom_framework(input_video, segment_length=500):
     motion = calculate_motion(extract_frames_yield(input_video))  # Calculate motion between consecutive images
     i_s = find_least_motion_segment(motion, segment_length)  # Starting segment with the least inter frame motion
 
-    raw_sig = vj_face_detector(input_video, framework='CHROM', width=1, height=1)  # Get the raw RGB signals
+    raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)  # Get the raw RGB signals
 
     selected_segment = raw_sig[i_s:i_s + segment_length]  # Select the segment with least inter frame motion
     normalized = normalize(selected_segment)  # Normalize the selected segment

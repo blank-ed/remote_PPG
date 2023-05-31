@@ -1,14 +1,3 @@
-# 1) VJ to detect face (DONE)
-# 2) DRMF method to find the coordinates of 66 facial landmarks
-# 3) Using l=9 points out of 66 to mark and define the ROI
-# 4) feature points are detected inside the rectangle using standard 'good feature to track' and are tracked through the following frames using KLT algorithm
-# 5) get the raw green value (DONE)
-# 6) Illumination rectification (DONE)
-# 7) Non-rigid motion elimination (DONE)
-# 8) 3 filters: detrending filter, moving-average filter, hamming window based finite impulse response filter with cutoff frequency of 0.7 to 4 hz (DONE)
-# 9) after filtering, PSD with welchs method is applied
-
-
 """
 
 This module contains the framework implemented by
@@ -25,37 +14,68 @@ import numpy as np
 from scipy.stats import cumfreq
 
 
-def licvpr_framework(input_video):
+def licvpr_framework(input_video, heart_rate_calculation_mode='average', hr_interval=None):
     """
     :param input_video:
         This takes in an input video file
+    :param heart_rate_calculation_mode:
+        The mode of heart rate calculation to be used. It can be set to one of the following:
+        - 'average': The function computes the average heart rate over the entire duration of the video.
+        - 'continuous': The function computes the heart rate at regular specified intervals throughout the video.
+        The default value is 'average'.
+    :param hr_interval
+        This parameter is used when 'heart_rate_calculation_mode' is set to 'continuous'. It specifies the time interval
+        (in seconds) at which the heart rate is calculated throughout the video. If not set, a default interval of
+        10 seconds is used.
     :return:
-
+        Returns the estimated heart rate of the input video based on LiCVPR framework
     """
 
-    raw_green_sig = vj_face_detector(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
+    if hr_interval is None:
+        hr_interval = 10
+
+    raw_green_sig = extract_raw_sig(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
     fps = get_fps(input_video)  # find the fps of the video
-    raw_bg_green_signal = raw_bg_signal(input_video, color='g')  # Get the raw background green signal
+    raw_bg_green_signal = extract_raw_bg_signal(input_video, color='g')  # Get the raw background green signal
 
     # Apply the Illumination Rectification filter
     g_ir = rectify_illumination(face_color=np.array(raw_green_sig), bg_color=np.array(raw_bg_green_signal))
 
+    # Apply the non-rigid motion elimination
     motion_eliminated = non_rigid_motion_elimination(signal=g_ir.tolist(), segment_length=1, fps=fps, threshold=0.05)
 
+    # Filter the signal using detrending, moving average and bandpass filter
     detrended = detrending_filter(signal=np.array(motion_eliminated), Lambda=300)
     moving_average = moving_average_filter(signal=detrended, window_size=3)
-    bp_filtered = fir_bp_filter(moving_average, fps=30, low=0.7, high=4)
+    bp_filtered = fir_bp_filter(moving_average, fps=fps, low=0.7, high=4)
 
-    frequencies, psd = welch(bp_filtered, fs=30, nperseg=256, nfft=2048)
+    if heart_rate_calculation_mode == 'continuous':
+        windowed_signals = moving_window(sig=bp_filtered, fps=fps, window_size=hr_interval, increment=hr_interval)
+        hr = []
 
-    first = np.where(frequencies > 0.7)[0]
-    last = np.where(frequencies < 4)[0]
-    first_index = first[0]
-    last_index = last[-1]
-    range_of_interest = range(first_index, last_index + 1, 1)
-    max_idx = np.argmax(psd[range_of_interest])
-    f_max = frequencies[range_of_interest[max_idx]]
-    hr = f_max * 60.0
+        for each_signal_window in windowed_signals:
+            frequencies, psd = welch(each_signal_window, fs=fps, nperseg=256, nfft=2048)
+
+            first = np.where(frequencies > 0.7)[0]
+            last = np.where(frequencies < 4)[0]
+            first_index = first[0]
+            last_index = last[-1]
+            range_of_interest = range(first_index, last_index + 1, 1)
+            max_idx = np.argmax(psd[range_of_interest])
+            f_max = frequencies[range_of_interest[max_idx]]
+            hr.append(f_max * 60.0)
+
+    elif heart_rate_calculation_mode == 'average':
+        frequencies, psd = welch(bp_filtered, fs=fps, nperseg=256, nfft=2048)
+
+        first = np.where(frequencies > 0.7)[0]
+        last = np.where(frequencies < 4)[0]
+        first_index = first[0]
+        last_index = last[-1]
+        range_of_interest = range(first_index, last_index + 1, 1)
+        max_idx = np.argmax(psd[range_of_interest])
+        f_max = frequencies[range_of_interest[max_idx]]
+        hr = f_max * 60.0
 
     return hr
 
