@@ -6,7 +6,7 @@
 # 6) Illumination rectification (DONE)
 # 7) Non-rigid motion elimination (DONE)
 # 8) 3 filters: detrending filter, moving-average filter, hamming window based finite impulse response filter with cutoff frequency of 0.7 to 4 hz (DONE)
-# 9) after filtering, PSD with welchs method is applied
+# 9) after filtering, PSD with welchs method is applied (DONE)
 
 
 """
@@ -30,7 +30,7 @@ def licvpr_framework(input_video):
     :param input_video:
         This takes in an input video file
     :return:
-
+        Returns the estimated heart rate of the input video based on LiCVPR framework
     """
 
     raw_green_sig = vj_face_detector(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
