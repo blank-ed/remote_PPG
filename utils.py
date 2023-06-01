@@ -1,7 +1,5 @@
 # This file houses algorithms that have not been segmented into their respective stages
 
-import cv2
-import numpy as np
 from remote_PPG.filters import *
 import mediapipe as mp
 from mediapipe.tasks.python import vision, BaseOptions
@@ -23,7 +21,7 @@ def extract_frames_yield(input_video):
     cap.release()
 
 
-def extract_raw_sig(input_video, framework=None, width=1, height=1):
+def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=1):
     """
     :param input_video:
         This takes in an input video file
@@ -48,14 +46,17 @@ def extract_raw_sig(input_video, framework=None, width=1, height=1):
 
     raw_sig = []
 
+    mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
+                                                   min_detection_confidence=0.5)
     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
+
     for frame in extract_frames_yield(input_video):
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5, minSize=(30, 30))
 
-        if len(faces) == 0 and face_coordinates_prev is not None:
+        if (len(faces) == 0 or len(faces) > 1) and face_coordinates_prev is not None:
             x, y, w, h = face_coordinates_prev
             x1 = int(x + (1 - width) / 2 * w)
             y1 = int(y + (1 - height) / 2 * h)
@@ -72,31 +73,112 @@ def extract_raw_sig(input_video, framework=None, width=1, height=1):
                 y2 = int(y + (1 + height) / 2 * h)
                 roi = frame[y1:y2, x1:x2]
 
+        results = mp_face_mesh.process(frame)
+
+        if results.multi_face_landmarks:
+            for face_landmarks in results.multi_face_landmarks:
+                landmarks = face_landmarks.landmark
+                if framework == 'GREEN':
+                    selected_landmarks = [67, 299, 296, 297, 10]
+                elif framework == 'LiCVPR':
+                    selected_landmarks = [234, 132, 136, 152, 365, 361, 454, 380, 144]
+
+                selected_coordinates = [
+                    (int(landmarks[i].x * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
+                    selected_landmarks]
+
         if framework == 'PCA':
             red_values = np.sum(roi[:, :, 2], axis=(0, 1))
             green_values = np.sum(roi[:, :, 1], axis=(0, 1))
             blue_values = np.sum(roi[:, :, 0], axis=(0, 1))
             raw_sig.append([red_values, green_values, blue_values])
+
         elif framework == 'CHROM':
             filtered_roi = simple_skin_selection(roi)
             b, g, r, a = cv2.mean(filtered_roi)
             raw_sig.append([r, g, b])
+
         elif framework == 'ICA':
             b, g, r, a = cv2.mean(roi)
             raw_sig.append([r, g, b])
-        elif framework == 'LiCVPR':
-            b, g, r, a = cv2.mean(roi)
-            raw_sig.append(g)
-        elif framework == 'GREEN':
-            h, w, _ = frame.shape
-            x1 = int(w * 0.01)
-            y1 = int(h * 0.06)
-            x2 = int(w * 0.96)
-            y2 = int(h * 0.98)
-            roi = frame[y1:y2, x1:x2]
 
-            b, g, r, a = cv2.mean(roi)
+        elif framework == 'LiCVPR':
+            d1 = abs(selected_coordinates[0][0] - selected_coordinates[6][0])
+            d2 = abs(selected_coordinates[1][0] - selected_coordinates[5][0])
+            d3 = abs(selected_coordinates[2][0] - selected_coordinates[4][0])
+
+            d4 = abs(selected_coordinates[8][1] - selected_coordinates[2][1])
+            d5 = abs(selected_coordinates[7][1] - selected_coordinates[4][1])
+            d6 = abs(selected_coordinates[3][1] - selected_coordinates[6][1])
+
+            extension = [(int(0.05 * d1), 0), (int(0.075 * d2), 0), (int(0.1 * d3), 0), (0, -int(0.075 * d6)),
+                         (-int(0.1 * d3), 0), (-int(0.075 * d2), 0), (-int(0.05 * d1), 0), (0, int(0.3 * d4)),
+                         (0, int(0.3 * d5))]
+
+            facial_landmark_coordinates = [(x[0] + y[0], x[1] + y[1]) for x, y in zip(selected_coordinates, extension)]
+
+            contour = np.array(facial_landmark_coordinates, dtype=np.int32)
+            contour = contour.reshape((-1, 1, 2))
+
+            mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+            cv2.drawContours(mask, [contour], -1, (255, 255, 255), -1)
+
+            b, g, r, a = cv2.mean(frame, mask=mask)
+
             raw_sig.append(g)
+
+        elif framework == 'GREEN':
+            if ROI_type == 'ROI_I':
+                x1 = selected_coordinates[0][0]
+                y1 = selected_coordinates[4][1]
+                x2 = selected_coordinates[3][0]
+                distance = abs(selected_coordinates[1][1] - selected_coordinates[2][1])
+                y2 = int(selected_coordinates[1][1] + distance * 0.1)
+
+                roi = frame[y1:y2, x1:x2]
+
+            elif ROI_type == 'ROI_II':
+                x1 = selected_coordinates[0][0]
+                y1 = selected_coordinates[4][1]
+                x2 = selected_coordinates[3][0]
+                distance = abs(selected_coordinates[1][1] - selected_coordinates[2][1])
+                y2 = int(selected_coordinates[1][1] + distance * 0.1)
+
+                x = int((x1 + x2) / 2)
+                y = int(abs(y2 - y1) * 0.3 + y1)
+
+                roi = frame[y, x]
+
+            elif ROI_type == 'ROI_III':
+                x1_new = int(x2 - (abs(x1 - x2) * 0.1))
+                y1_new = y
+                x2_new = int(x2 + (abs(x1 - x2) * 0.2))
+                y2_new = y + int(h / 2)
+
+                roi = frame[y1_new:y2_new, x1_new:x2_new]
+
+            elif ROI_type == 'ROI_IV':
+                h, w, _ = frame.shape
+                x1 = int(w * 0.01)
+                y1 = int(h * 0.06)
+                x2 = int(w * 0.96)
+                y2 = int(h * 0.98)
+                roi = frame[y1:y2, x1:x2]
+
+            else:
+                assert False, "Invalid ROI type for the 'GREEN' framework. Please choose one of the valid ROI " \
+                              "types: 'ROI_I', 'ROI_II', 'ROI_III', or 'ROI_IV' "
+
+            if roi.shape == (3,):
+                b, g, r = roi
+            else:
+                b, g, r, a = cv2.mean(roi)
+
+            raw_sig.append(g)
+
+        else:
+            assert False, "Invalid framework. Please choose one of the valid available frameworks " \
+                          "types: 'PCA', 'CHROM', 'ICA', 'LiCVPR', or 'GREEN' "
 
     return raw_sig
 
@@ -115,15 +197,14 @@ def extract_raw_bg_signal(input_video, color='g'):
     raw_bg_sig = []
 
     model_path = 'Necessary_Files\\selfie_segmenter_landscape.tflite'
-    base_options = BaseOptions(model_asset_path=model_path)
 
-    mp_base_options = mp.tasks.BaseOptions
+    BaseOptions = mp.tasks.BaseOptions
     ImageSegmenter = mp.tasks.vision.ImageSegmenter
     ImageSegmenterOptions = mp.tasks.vision.ImageSegmenterOptions
     VisionRunningMode = mp.tasks.vision.RunningMode
 
     # Create an image segmenter instance with the video mode:
-    options = ImageSegmenterOptions(base_options=mp_base_options(model_asset_path=model_path),
+    options = ImageSegmenterOptions(base_options=BaseOptions(model_asset_path=model_path),
                                     running_mode=VisionRunningMode.VIDEO, output_category_mask=True)
 
     frame_counter = 0

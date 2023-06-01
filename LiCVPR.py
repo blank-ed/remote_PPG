@@ -14,10 +14,17 @@ import numpy as np
 from scipy.stats import cumfreq
 
 
-def licvpr_framework(input_video, heart_rate_calculation_mode='average', hr_interval=None):
+def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mode='average', hr_interval=None):
     """
     :param input_video:
         This takes in an input video file
+    :param raw_bg_green_signal:
+        Extract the raw background signal separately. There is an error with the latest mediapipe library.
+        To extract the raw background signal separately, do:
+
+        from remote_PPG.utils import *
+        raw_bg_signal = extract_raw_bg_signal(input_video, color='g')
+
     :param heart_rate_calculation_mode:
         The mode of heart rate calculation to be used. It can be set to one of the following:
         - 'average': The function computes the average heart rate over the entire duration of the video.
@@ -36,7 +43,7 @@ def licvpr_framework(input_video, heart_rate_calculation_mode='average', hr_inte
 
     raw_green_sig = extract_raw_sig(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
     fps = get_fps(input_video)  # find the fps of the video
-    raw_bg_green_signal = extract_raw_bg_signal(input_video, color='g')  # Get the raw background green signal
+    # raw_bg_green_signal = extract_raw_bg_signal(input_video, color='g')  # Get the raw background green signal
 
     # Apply the Illumination Rectification filter
     g_ir = rectify_illumination(face_color=np.array(raw_green_sig), bg_color=np.array(raw_bg_green_signal))
