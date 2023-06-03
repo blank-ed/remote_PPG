@@ -57,10 +57,10 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
     bp_filtered = fir_bp_filter(moving_average, fps=fps, low=0.7, high=4)
 
     if heart_rate_calculation_mode == 'continuous':
-        windowed_signals = moving_window(sig=bp_filtered, fps=fps, window_size=hr_interval, increment=hr_interval)
+        windowed_pulse_sig = moving_window(sig=bp_filtered, fps=fps, window_size=hr_interval, increment=hr_interval)
         hr = []
 
-        for each_signal_window in windowed_signals:
+        for each_signal_window in windowed_pulse_sig:
             frequencies, psd = welch(each_signal_window, fs=fps, nperseg=256, nfft=2048)
 
             first = np.where(frequencies > 0.7)[0]

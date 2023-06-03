@@ -73,7 +73,10 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                 y2 = int(y + (1 + height) / 2 * h)
                 roi = frame[y1:y2, x1:x2]
 
-        results = mp_face_mesh.process(frame)
+        if framework == 'LiCVPR':
+            results = mp_face_mesh.process(roi)
+        else:
+            results = mp_face_mesh.process(frame)
 
         if results.multi_face_landmarks:
             for face_landmarks in results.multi_face_landmarks:
@@ -84,7 +87,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                     selected_landmarks = [234, 132, 136, 152, 365, 361, 454, 380, 144]
 
                 selected_coordinates = [
-                    (int(landmarks[i].x * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
+                    (int(landmarks[i].sig * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
                     selected_landmarks]
 
         if framework == 'PCA':
@@ -96,6 +99,10 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
         elif framework == 'CHROM':
             filtered_roi = simple_skin_selection(roi)
             b, g, r, a = cv2.mean(filtered_roi)
+            raw_sig.append([r, g, b])
+
+        elif framework == 'POS':
+            b, g, r, a = cv2.mean(roi)
             raw_sig.append([r, g, b])
 
         elif framework == 'ICA':
