@@ -109,6 +109,9 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             b, g, r, a = cv2.mean(roi)
             raw_sig.append([r, g, b])
 
+        elif framework == 'PhysNet':
+            raw_sig.append(roi)
+
         elif framework == 'LiCVPR':
             d1 = abs(selected_coordinates[0][0] - selected_coordinates[6][0])
             d2 = abs(selected_coordinates[1][0] - selected_coordinates[5][0])
