@@ -48,13 +48,19 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
     mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
                                                    min_detection_confidence=0.5)
-    face_cascade = cv2.CascadeClassifier("remote_PPG\\Necessary_Files\\haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
+    frame_count = 0
 
     for frame in extract_frames_yield(input_video):
+        frame_count += 1
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5, minSize=(30, 30))
+
+        # Look through the first 30 frames until face is detected
+        if len(faces) == 0 and frame_count <= 30:
+            continue
 
         if (len(faces) == 0 or len(faces) > 1) and face_coordinates_prev is not None:
             x, y, w, h = face_coordinates_prev
@@ -99,9 +105,8 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             raw_sig.append([red_values, green_values, blue_values])
 
         elif framework == 'CHROM':
-            # filtered_roi = simple_skin_selection(roi)
-            # b, g, r, a = cv2.mean(filtered_roi)
-            b, g, r, a = cv2.mean(frame)
+            filtered_roi = simple_skin_selection(roi)
+            b, g, r, a = cv2.mean(filtered_roi)
             raw_sig.append([r, g, b])
 
         elif framework == 'POS':
