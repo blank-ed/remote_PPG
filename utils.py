@@ -48,7 +48,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
     mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
                                                    min_detection_confidence=0.5)
-    face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier("remote_PPG\\Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
 
     for frame in extract_frames_yield(input_video):
@@ -85,9 +85,11 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                     selected_landmarks = [67, 299, 296, 297, 10]
                 elif framework == 'LiCVPR':
                     selected_landmarks = [234, 132, 136, 152, 365, 361, 454, 380, 144]
+                else:
+                    selected_landmarks = [0]
 
                 selected_coordinates = [
-                    (int(landmarks[i].sig * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
+                    (int(landmarks[i].x * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
                     selected_landmarks]
 
         if framework == 'PCA':
@@ -97,8 +99,9 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             raw_sig.append([red_values, green_values, blue_values])
 
         elif framework == 'CHROM':
-            filtered_roi = simple_skin_selection(roi)
-            b, g, r, a = cv2.mean(filtered_roi)
+            # filtered_roi = simple_skin_selection(roi)
+            # b, g, r, a = cv2.mean(filtered_roi)
+            b, g, r, a = cv2.mean(frame)
             raw_sig.append([r, g, b])
 
         elif framework == 'POS':

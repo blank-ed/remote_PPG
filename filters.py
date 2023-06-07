@@ -3,7 +3,7 @@ from scipy.signal import firwin, filtfilt, medfilt, butter
 import cv2
 
 
-def normalize(signal):
+def normalize(signal, framework=None):
     """
     :param signal:
         Input signal to normalize to have zero-mean and unit variance
@@ -13,7 +13,14 @@ def normalize(signal):
     signal = np.array(signal)
     mean = np.mean(signal, axis=0)
     std_dev = np.std(signal, axis=0)
-    normalized_signal = (signal - mean) / std_dev
+
+    if framework == 'ICA':
+        normalized_signal = (signal - mean) / std_dev
+    elif framework == 'CHROM':
+        normalized_signal = signal / mean
+    else:
+        assert False, "Invalid framework for normalizing signal. Please choose one of the valid available frameworks " \
+                      "types: 'CHROM', or 'ICA' "
 
     # Turn normalized signal to [[R] [G] [B]]
     normalized = np.array([normalized_signal[:, i] for i in range(0, 3)])
@@ -40,7 +47,12 @@ def fir_bp_filter(signal, fps, low=0.5, high=3.7):
 
     # Filtering using the FIR bandpass filter coefficients.
     # Since its FIR bandpass filter, the denominator coefficient is set as 1
-    filtered_signal = filtfilt(filter_coefficients, 1, signal, axis=0)
+    if len(filter_coefficients) < len(signal):
+        padlen = 0
+    else:
+        padlen = None
+
+    filtered_signal = filtfilt(filter_coefficients, 1, signal, padlen=padlen, axis=0)
 
     return filtered_signal
 
