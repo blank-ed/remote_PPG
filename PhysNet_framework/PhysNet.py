@@ -5,8 +5,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import Adam
 from PhysNetED_BMVC import PhysNet_padding_Encoder_Decoder_MAX
 from NegPearsonLoss import Neg_Pearson
-import cv2
-import numpy as np
 from remote_PPG.utils import *
 
 

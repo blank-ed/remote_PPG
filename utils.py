@@ -118,7 +118,13 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             raw_sig.append([r, g, b])
 
         elif framework == 'PhysNet':
-            raw_sig.append(roi)
+            resized_roi = cv2.resize(roi, (128, 128))
+            raw_sig.append(resized_roi)
+
+        elif framework == 'DeepPhys':
+            # U have two types of ROI. Impleement them. For now just use ROI from VJ
+            downsampled_image = cv2.resize(roi, (36, 36), interpolation=cv2.INTER_CUBIC)
+            raw_sig.append(downsampled_image)
 
         elif framework == 'LiCVPR':
             d1 = abs(selected_coordinates[0][0] - selected_coordinates[6][0])
