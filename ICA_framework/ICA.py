@@ -13,7 +13,7 @@ from scipy.fft import rfft, rfftfreq
 from scipy.signal import find_peaks
 
 
-def ica_framework(input_video, comp=1, hr_change_threshold=12):
+def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
     """
     :param input_video:
         This takes in an input video file
@@ -29,7 +29,14 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12):
     """
 
     raw_sig = extract_raw_sig(input_video, framework='ICA', width=0.6, height=1)  # get the raw RGB signals
-    fps = get_fps(input_video)  # find the fps of the video
+    if dataset is None:
+        fps = get_fps(input_video)  # find the fps of the video
+    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+        fps = 30
+    else:
+        assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+                     "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+
 
     # signal windowing with 96.7% overlap
     windowed_sig = moving_window(sig=raw_sig, fps=fps, window_size=30, increment=1)
@@ -37,7 +44,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12):
 
     prev_hr = None  # Previous HR value
     for sig in windowed_sig:
-        normalized = normalize(sig)  # normalize the windowed signal
+        normalized = normalize(sig, framework='ICA')  # normalize the windowed signal
 
         # Apply JADE ICA algorithm and select the second component
         W = jadeR(normalized)

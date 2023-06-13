@@ -11,7 +11,7 @@ from remote_PPG.utils import *
 from scipy.interpolate import PchipInterpolator
 
 
-def piecewise_cubic_hermite_interpolator(ground_truth_signal, sampling_rate, fps):
+def piecewise_cubic_hermite_interpolator(ground_truth_signal: list, sampling_rate: int, fps: int):
     # Your original data
     ground_truth = np.array(ground_truth_signal)
 

@@ -48,7 +48,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
     mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
                                                    min_detection_confidence=0.5)
-    face_cascade = cv2.CascadeClassifier("..\\Necessary_Files\\haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
     frame_count = 0
 
