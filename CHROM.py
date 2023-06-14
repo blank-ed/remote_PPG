@@ -12,7 +12,7 @@ from remote_PPG.filters import normalize
 import numpy as np
 
 
-def chrom_framework(input_video, subject_type='motion'):
+def chrom_framework(input_video, subject_type='motion', dataset=None):
     """
     :param input_video:
         This takes in an input video file
@@ -37,7 +37,13 @@ def chrom_framework(input_video, subject_type='motion'):
         i_s = find_least_motion_segment(motion, segment_length)  # Starting segment with the least inter frame motion
 
         raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)  # Get the raw RGB signals
-        fps = get_fps(input_video)
+        if dataset is None:
+            fps = get_fps(input_video)  # find the fps of the video
+        elif dataset == 'UBFC1' or dataset == 'UBFC2':
+            fps = 30
+        else:
+            assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+                         "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
 
         selected_segment = raw_sig[i_s:i_s + segment_length]  # Select the segment with least inter frame motion
         normalized = normalize(selected_segment, framework='CHROM')  # Normalize the selected segment
@@ -66,7 +72,13 @@ def chrom_framework(input_video, subject_type='motion'):
 
     elif subject_type == 'motion':
         raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)
-        fps = get_fps(input_video)
+        if dataset is None:
+            fps = get_fps(input_video)  # find the fps of the video
+        elif dataset == 'UBFC1' or dataset == 'UBFC2':
+            fps = 30
+        else:
+            assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+                          "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
 
         N = len(raw_sig)
         H = np.zeros(N)
@@ -152,8 +164,165 @@ def find_least_motion_segment(motion, segment_length):
 
 ### TEST SECTION
 
-# hr = chrom_framework(input_video=r'C:\Users\Admin\Desktop\LGI-PPG Dataset\gym\1alex_gym\cv_camera_sensor_stream_handler.avi', subject_type='motion')
-# print(hr)
+import pandas as pd
+import os
+from sklearn.metrics import mean_absolute_error
+
+def chrom_ubfc1(ground_truth_file, sampling_frequency=60):
+    gtdata = pd.read_csv(ground_truth_file, header=None)
+    gtTrace = gtdata.iloc[:, 3].tolist()
+    gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
+    gtHR = gtdata.iloc[:, 1]
+
+    N = len(gtTrace)
+    H = np.zeros(N)
+    l = int(sampling_frequency * 1.6)
+
+    window = moving_window(gtTrace, fps=sampling_frequency, window_size=1.6, increment=0.8)
+
+    for enum, each_window in enumerate(window):
+        normalized = np.array(each_window) / np.mean(each_window)
+
+        # bandpass filter Xs and Ys here
+        filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
+
+        SWin = np.multiply(filtered, windows.hann(len(filtered)))
+
+        start = enum * (l // 2)
+        end = enum * (l // 2) + l
+
+        if end > len(gtTrace):
+            H[len(gtTrace) - l:len(gtTrace)] = H[len(gtTrace) - l:len(gtTrace)] + SWin
+        else:
+            H[start:end] = H[start:end] + SWin
+
+    # Compute STFT
+    noverlap = sampling_frequency * (
+                12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
+
+    frequencies, times, Zxx = stft(H, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+
+    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    # Detect Peaks for each time slice
+    hrGT = []
+    for i in range(magnitude_Zxx.shape[1]):
+        peaks, _ = find_peaks(magnitude_Zxx[:, i])
+        if len(peaks) > 0:
+            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+            hrGT.append(peak_freq * 60)
+        else:
+            hrGT.append(None)
+
+    return hrGT
+
+
+def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
+    gtdata = pd.read_csv(ground_truth_file, delimiter='\t', header=None)
+    gtTrace = [float(item) for item in gtdata.iloc[0, 0].split(' ') if item != '']
+    gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
+    gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
+
+    N = len(gtTrace)
+    H = np.zeros(N)
+    l = int(sampling_frequency * 1.6)
+
+    window = moving_window(gtTrace, fps=sampling_frequency, window_size=1.6, increment=0.8)
+
+    for enum, each_window in enumerate(window):
+        normalized = np.array(each_window) / np.mean(each_window)
+
+        # bandpass filter Xs and Ys here
+        filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
+
+        SWin = np.multiply(filtered, windows.hann(len(filtered)))
+
+        start = enum * (l // 2)
+        end = enum * (l // 2) + l
+
+        if end > len(gtTrace):
+            H[len(gtTrace) - l:len(gtTrace)] = H[len(gtTrace) - l:len(gtTrace)] + SWin
+        else:
+            H[start:end] = H[start:end] + SWin
+
+    # Compute STFT
+    noverlap = sampling_frequency * (
+                12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
+
+    frequencies, times, Zxx = stft(H, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+
+    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    # Detect Peaks for each time slice
+    hrGT = []
+    for i in range(magnitude_Zxx.shape[1]):
+        peaks, _ = find_peaks(magnitude_Zxx[:, i])
+        if len(peaks) > 0:
+            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+            hrGT.append(peak_freq * 60)
+        else:
+            hrGT.append(None)
+
+    return hrGT
+
+
+# MAE = []
+chrom_true = []
+chrom_pred = []
+base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+for sub_folders in os.listdir(base_dir):
+    if sub_folders == 'UBFC1':
+        for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+            subjects = os.path.join(base_dir, sub_folders, folders)
+            for each_subject in os.listdir(subjects):
+                if each_subject.endswith('.avi'):
+                    vid = os.path.join(subjects, each_subject)
+                elif each_subject.endswith('.xmp'):
+                    gt = os.path.join(subjects, each_subject)
+
+            print(vid, gt)
+            hrES = chrom_framework(input_video=vid, dataset='UBFC1')
+            hrGT = chrom_ubfc1(ground_truth_file=gt)
+            print(len(hrGT), len(hrES))
+            print('')
+            chrom_true.append(np.mean(hrGT))
+            chrom_pred.append(np.mean(hrES))
+            # if len(hrGT) > len(hrES):
+            #     MAE.append(mean_absolute_error(hrGT[0:len(hrES)], hrES))
+            # else:
+            #     MAE.append(mean_absolute_error(hrGT, hrES[0:len(hrGT)]))
+
+    elif sub_folders == 'UBFC2':
+        for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+            subjects = os.path.join(base_dir, sub_folders, folders)
+            for each_subject in os.listdir(subjects):
+                if each_subject.endswith('.avi'):
+                    vid = os.path.join(subjects, each_subject)
+                elif each_subject.endswith('.txt'):
+                    gt = os.path.join(subjects, each_subject)
+
+            print(vid, gt)
+            hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+            hrGT = chrom_ubfc2(ground_truth_file=gt)
+            print(len(hrGT), len(hrES))
+            print('')
+            chrom_true.append(np.mean(hrGT))
+            chrom_pred.append(np.mean(hrES))
+            # if len(hrGT) > len(hrES):
+            #     MAE.append(mean_absolute_error(hrGT[0:len(hrES)], hrES))
+            # else:
+            #     MAE.append(mean_absolute_error(hrGT, hrES[0:len(hrGT)]))
+
+print(mean_absolute_error(chrom_true, chrom_pred))
+
+# print(MAE)
+# print(np.mean(MAE))
+
+# [24.878048780487806, 16.29629629629629, 15.1875, 11.041666666666664, 9.999999999999996, 18.397435897435898, 11.851851851851853, 10.175438596491228, 16.037735849056602, 11.53225806451613, 13.404255319148936, 9.905660377358489, 18.47826086956522, 13.623188405797102, 14.492753623188406, 14.202898550724637, 19.11764705882353, 33.69565217391305, 13.529411764705882, 26.44927536231884, 13.571428571428573, 9.5, 8.405797101449275, 9.492753623188406, 11.376811594202898, 15.671641791044776, 9.926470588235293, 10.3, 10.882352941176471, 10.000000000000002, 15.579710144927539, 11.956521739130432, 15.289855072463768, 13.235294117647058, 9.927536231884059, 7.285714285714286, 11.5, 16.0, 14.0, 29.63768115942029, 11.08695652173913, 13.043478260869563, 9.357142857142858, 9.63235294117647, 12.46376811594203, 10.0, 12.5, 18.840579710144926, 11.716417910447761, 11.014492753623191]
+
 
 ### END TEST SECTION
 
