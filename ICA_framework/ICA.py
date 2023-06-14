@@ -29,13 +29,14 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
     """
 
     raw_sig = extract_raw_sig(input_video, framework='ICA', width=0.6, height=1)  # get the raw RGB signals
-    if dataset is None:
-        fps = get_fps(input_video)  # find the fps of the video
-    elif dataset == 'UBFC1' or dataset == 'UBFC2':
-        fps = 30
-    else:
-        assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
-                     "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+    fps = get_fps(input_video)  # find the fps of the video
+    # if dataset is None:
+    #     fps = get_fps(input_video)  # find the fps of the video
+    # elif dataset == 'UBFC1' or dataset == 'UBFC2':
+    #     fps = 30
+    # else:
+    #     assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+    #                  "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
 
 
     # signal windowing with 96.7% overlap
