@@ -14,7 +14,7 @@ import numpy as np
 from scipy.stats import cumfreq
 
 
-def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mode='average', hr_interval=None):
+def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mode='average', hr_interval=None, dataset=None):
     """
     :param input_video:
         This takes in an input video file
@@ -42,8 +42,17 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
         hr_interval = 10
 
     raw_green_sig = extract_raw_sig(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
-    fps = get_fps(input_video)  # find the fps of the video
-    # raw_bg_green_signal = extract_raw_bg_signal(input_video, color='g')  # Get the raw background green signal
+
+    if dataset is None:
+        fps = get_fps(input_video)  # find the fps of the video
+    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+        fps = 30
+    else:
+        assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+                      "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+
+    if len(raw_green_sig) != len(raw_bg_green_signal):
+        raw_bg_green_signal = raw_bg_green_signal[abs(len(raw_green_sig)-len(raw_bg_green_signal)):]
 
     # Apply the Illumination Rectification filter
     g_ir = rectify_illumination(face_color=np.array(raw_green_sig), bg_color=np.array(raw_bg_green_signal))
@@ -83,6 +92,10 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
         max_idx = np.argmax(psd[range_of_interest])
         f_max = frequencies[range_of_interest[max_idx]]
         hr = f_max * 60.0
+
+    else:
+        assert False, "Invalid heart rate calculation mode type. Please choose one of the valid available types " \
+                       "types: 'continuous', or 'average' "
 
     return hr
 
@@ -231,3 +244,215 @@ def non_rigid_motion_elimination(signal, segment_length, fps, threshold=0.05):
 
     return motion_eliminated
 
+
+# Test Section
+
+import pandas as pd
+import os
+from sklearn.metrics import mean_absolute_error
+from scipy.signal import welch
+
+def licvpr_ubfc1(ground_truth_file, heart_rate_calculation_mode='average', sampling_frequency=60, hr_interval=None):
+    gtdata = pd.read_csv(ground_truth_file, header=None)
+    gtTrace = gtdata.iloc[:, 3].tolist()
+    gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
+    gtHR = gtdata.iloc[:, 1]
+
+    if hr_interval is None:
+        hr_interval = 10
+
+    # Filter the signal using detrending, moving average and bandpass filter
+    detrended = detrending_filter(signal=np.array(gtTrace), Lambda=300)
+    moving_average = moving_average_filter(signal=detrended, window_size=3)
+    bp_filtered = fir_bp_filter(moving_average, fps=sampling_frequency, low=0.7, high=4)
+
+    if heart_rate_calculation_mode == 'continuous':
+        windowed_pulse_sig = moving_window(sig=bp_filtered, fps=sampling_frequency, window_size=hr_interval,
+                                           increment=hr_interval)
+        hrGT = []
+
+        for each_signal_window in windowed_pulse_sig:
+            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=256, nfft=2048)
+
+            first = np.where(frequencies > 0.7)[0]
+            last = np.where(frequencies < 4)[0]
+            first_index = first[0]
+            last_index = last[-1]
+            range_of_interest = range(first_index, last_index + 1, 1)
+            max_idx = np.argmax(psd[range_of_interest])
+            f_max = frequencies[range_of_interest[max_idx]]
+            hrGT.append(f_max * 60.0)
+
+    elif heart_rate_calculation_mode == 'average':
+        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=256, nfft=2048)
+
+        first = np.where(frequencies > 0.7)[0]
+        last = np.where(frequencies < 4)[0]
+        first_index = first[0]
+        last_index = last[-1]
+        range_of_interest = range(first_index, last_index + 1, 1)
+        max_idx = np.argmax(psd[range_of_interest])
+        f_max = frequencies[range_of_interest[max_idx]]
+        hrGT = f_max * 60.0
+
+    else:
+        assert False, "Invalid heart rate calculation mode type. Please choose one of the valid available types " \
+                       "types: 'continuous', or 'average' "
+
+    return hrGT
+
+
+def licvpr_ubfc2(ground_truth_file, heart_rate_calculation_mode='average', sampling_frequency=30, hr_interval=None):
+    gtdata = pd.read_csv(ground_truth_file, delimiter='\t', header=None)
+    gtTrace = [float(item) for item in gtdata.iloc[0, 0].split(' ') if item != '']
+    gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
+    gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
+
+    if hr_interval is None:
+        hr_interval = 10
+
+    # Filter the signal using detrending, moving average and bandpass filter
+    detrended = detrending_filter(signal=np.array(gtTrace), Lambda=300)
+    moving_average = moving_average_filter(signal=detrended, window_size=3)
+    bp_filtered = fir_bp_filter(moving_average, fps=sampling_frequency, low=0.7, high=4)
+
+    if heart_rate_calculation_mode == 'continuous':
+        windowed_pulse_sig = moving_window(sig=bp_filtered, fps=sampling_frequency, window_size=hr_interval,
+                                           increment=hr_interval)
+        hrGT = []
+
+        for each_signal_window in windowed_pulse_sig:
+            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=256, nfft=2048)
+
+            first = np.where(frequencies > 0.7)[0]
+            last = np.where(frequencies < 4)[0]
+            first_index = first[0]
+            last_index = last[-1]
+            range_of_interest = range(first_index, last_index + 1, 1)
+            max_idx = np.argmax(psd[range_of_interest])
+            f_max = frequencies[range_of_interest[max_idx]]
+            hrGT.append(f_max * 60.0)
+
+    elif heart_rate_calculation_mode == 'average':
+        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=256, nfft=2048)
+
+        first = np.where(frequencies > 0.7)[0]
+        last = np.where(frequencies < 4)[0]
+        first_index = first[0]
+        last_index = last[-1]
+        range_of_interest = range(first_index, last_index + 1, 1)
+        max_idx = np.argmax(psd[range_of_interest])
+        f_max = frequencies[range_of_interest[max_idx]]
+        hrGT = f_max * 60.0
+
+    else:
+        assert False, "Invalid heart rate calculation mode type. Please choose one of the valid available types " \
+                       "types: 'continuous', or 'average' "
+
+    return hrGT
+
+
+import ast
+
+licvpr_true = []
+licvpr_pred = []
+# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+
+raw_bg_signals_ubfc1 = []
+with open('UBFC1.txt', 'r') as f:
+    lines = f.readlines()
+    for x in lines:
+        raw_bg_signals_ubfc1.append(ast.literal_eval(x))
+
+raw_bg_signals_ubfc2 = []
+with open('UBFC2.txt', 'r') as f:
+    lines = f.readlines()
+    for x in lines:
+        raw_bg_signals_ubfc2.append(ast.literal_eval(x))
+
+# # raw_bg_signal_ubfc1 = []
+# raw_bg_signal_ubfc2 = []
+#
+# for sub_folders in os.listdir(base_dir):
+#     # if sub_folders == 'UBFC1':
+#     #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#     #         subjects = os.path.join(base_dir, sub_folders, folders)
+#     #         for each_subject in os.listdir(subjects):
+#     #             if each_subject.endswith('.avi'):
+#     #                 vid = os.path.join(subjects, each_subject)
+#     #                 print(vid)
+#     #                 bg_sig = extract_raw_bg_signal(input_video=vid)
+#     #                 print(bg_sig)
+#     #                 raw_bg_signal_ubfc1.append(bg_sig)
+#
+#     if sub_folders == 'UBFC2':
+#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                     print(vid)
+#                     bg_sig = extract_raw_bg_signal(input_video=vid)
+#                     # print(bg_sig)
+#                     raw_bg_signal_ubfc2.append(bg_sig)
+#
+# print(raw_bg_signal_ubfc2)
+#
+# with open('UBFC2.txt', 'w') as f:
+#     f.write(str(raw_bg_signal_ubfc2))
+#     f.write('\n')
+
+
+for sub_folders in os.listdir(base_dir):
+    if sub_folders == 'UBFC1':
+        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+            subjects = os.path.join(base_dir, sub_folders, folders)
+            for each_subject in os.listdir(subjects):
+                if each_subject.endswith('.avi'):
+                    vid = os.path.join(subjects, each_subject)
+                elif each_subject.endswith('.xmp'):
+                    gt = os.path.join(subjects, each_subject)
+
+            print(vid, gt)
+
+            # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
+            hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc1[enum],
+                                    heart_rate_calculation_mode='average', hr_interval=None, dataset='UBFC1')
+            hrGT = licvpr_ubfc1(ground_truth_file=gt, heart_rate_calculation_mode='average', sampling_frequency=60,
+                                hr_interval=None)
+            # print(len(hrGT), len(hrES))
+            print('')
+            licvpr_true.append(np.mean(hrGT))
+            licvpr_pred.append(np.mean(hrES))
+
+    elif sub_folders == 'UBFC2':
+        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+            subjects = os.path.join(base_dir, sub_folders, folders)
+            for each_subject in os.listdir(subjects):
+                if each_subject.endswith('.avi'):
+                    vid = os.path.join(subjects, each_subject)
+                elif each_subject.endswith('.txt'):
+                    gt = os.path.join(subjects, each_subject)
+
+            print(vid, gt)
+            # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
+            hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
+                                    heart_rate_calculation_mode='average', hr_interval=None, dataset='UBFC2')
+            hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='average', sampling_frequency=30,
+                                hr_interval=None)
+            # print(len(hrGT), len(hrES))
+            print('')
+            licvpr_true.append(np.mean(hrGT))
+            licvpr_pred.append(np.mean(hrES))
+
+print(licvpr_true)
+print(licvpr_pred)
+print(mean_absolute_error(licvpr_true, licvpr_pred))
+print(mean_absolute_error(licvpr_true[8:], licvpr_pred[8:]))
+
+true = [75.5859375, 79.1015625, 91.40625, 61.5234375, 68.5546875, 73.828125, 89.6484375, 105.46875, 109.86328125, 94.04296875, 113.37890625, 99.31640625, 113.37890625, 108.10546875, 117.7734375, 125.68359375, 68.5546875, 111.62109375, 72.0703125, 116.015625, 94.04296875, 87.01171875, 126.5625, 132.71484375, 105.46875, 67.67578125, 94.04296875, 114.2578125, 99.31640625, 113.37890625, 100.1953125, 78.22265625, 115.13671875, 116.89453125, 116.015625, 115.13671875, 122.16796875, 61.5234375, 109.86328125, 84.375, 87.890625, 100.1953125, 97.55859375, 100.1953125, 80.859375, 111.62109375, 93.1640625, 109.86328125, 90.52734375, 87.01171875]
+pred = [59.765625, 70.3125, 67.67578125, 64.16015625, 74.70703125, 79.98046875, 80.859375, 89.6484375, 103.7109375, 72.94921875, 87.01171875, 101.07421875, 63.28125, 70.3125, 77.34375, 84.375, 86.1328125, 67.67578125, 68.5546875, 72.0703125, 69.43359375, 64.16015625, 60.64453125, 72.94921875, 102.83203125, 64.16015625, 54.4921875, 108.984375, 58.0078125, 88.76953125, 59.765625, 59.765625, 65.91796875, 57.12890625, 63.28125, 136.23046875, 67.67578125, 96.6796875, 65.0390625, 69.43359375, 75.5859375, 61.5234375, 69.43359375, 76.46484375, 72.94921875, 61.5234375, 66.796875, 99.31640625, 86.1328125, 60.64453125]
+
+# 26.630859375
+# 29.610770089285715

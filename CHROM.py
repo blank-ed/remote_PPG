@@ -271,8 +271,8 @@ def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
 # MAE = []
 chrom_true = []
 chrom_pred = []
-base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 for sub_folders in os.listdir(base_dir):
     if sub_folders == 'UBFC1':
         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
@@ -290,10 +290,6 @@ for sub_folders in os.listdir(base_dir):
             print('')
             chrom_true.append(np.mean(hrGT))
             chrom_pred.append(np.mean(hrES))
-            # if len(hrGT) > len(hrES):
-            #     MAE.append(mean_absolute_error(hrGT[0:len(hrES)], hrES))
-            # else:
-            #     MAE.append(mean_absolute_error(hrGT, hrES[0:len(hrGT)]))
 
     elif sub_folders == 'UBFC2':
         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
@@ -311,18 +307,11 @@ for sub_folders in os.listdir(base_dir):
             print('')
             chrom_true.append(np.mean(hrGT))
             chrom_pred.append(np.mean(hrES))
-            # if len(hrGT) > len(hrES):
-            #     MAE.append(mean_absolute_error(hrGT[0:len(hrES)], hrES))
-            # else:
-            #     MAE.append(mean_absolute_error(hrGT, hrES[0:len(hrGT)]))
 
+print(chrom_true)
+print(chrom_pred)
 print(mean_absolute_error(chrom_true, chrom_pred))
-
-# print(MAE)
-# print(np.mean(MAE))
-
-# [24.878048780487806, 16.29629629629629, 15.1875, 11.041666666666664, 9.999999999999996, 18.397435897435898, 11.851851851851853, 10.175438596491228, 16.037735849056602, 11.53225806451613, 13.404255319148936, 9.905660377358489, 18.47826086956522, 13.623188405797102, 14.492753623188406, 14.202898550724637, 19.11764705882353, 33.69565217391305, 13.529411764705882, 26.44927536231884, 13.571428571428573, 9.5, 8.405797101449275, 9.492753623188406, 11.376811594202898, 15.671641791044776, 9.926470588235293, 10.3, 10.882352941176471, 10.000000000000002, 15.579710144927539, 11.956521739130432, 15.289855072463768, 13.235294117647058, 9.927536231884059, 7.285714285714286, 11.5, 16.0, 14.0, 29.63768115942029, 11.08695652173913, 13.043478260869563, 9.357142857142858, 9.63235294117647, 12.46376811594203, 10.0, 12.5, 18.840579710144926, 11.716417910447761, 11.014492753623191]
-
+print(mean_absolute_error(chrom_true[6:], chrom_pred[6:]))
 
 ### END TEST SECTION
 

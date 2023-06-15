@@ -2,6 +2,7 @@
 
 from remote_PPG.filters import *
 import mediapipe as mp
+import os
 from mediapipe.tasks.python import vision, BaseOptions
 
 
@@ -50,6 +51,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                                                    min_detection_confidence=0.5)
     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
     face_coordinates_prev = None
+    mp_coordinates_prev = None
     frame_count = 0
 
     for frame in extract_frames_yield(input_video):
@@ -97,6 +99,13 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                 selected_coordinates = [
                     (int(landmarks[i].x * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
                     selected_landmarks]
+                mp_coordinates_prev = selected_coordinates
+
+        else:
+            if mp_coordinates_prev is not None:  # Check if mp_coordinates_prev is not None
+                selected_coordinates = mp_coordinates_prev
+            else:
+                continue
 
         if framework == 'PCA':
             red_values = np.sum(roi[:, :, 2], axis=(0, 1))
@@ -220,7 +229,8 @@ def extract_raw_bg_signal(input_video, color='g'):
 
     raw_bg_sig = []
 
-    model_path = 'Necessary_Files\\selfie_segmenter_landscape.tflite'
+    # model_path = 'Necessary_Files\\selfie_segmenter_landscape.tflite'
+    model_path = 'C:\\Users\\Admin\\PycharmProjects\\pythonProject2\\remote_PPG\\Necessary_Files\\selfie_segmenter_landscape.tflite'
 
     BaseOptions = mp.tasks.BaseOptions
     ImageSegmenter = mp.tasks.vision.ImageSegmenter
