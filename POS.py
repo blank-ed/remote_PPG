@@ -25,28 +25,20 @@ def pos_framework(input_video, dataset=None):
     H = np.zeros(N)
     l = int(fps * 1.6)
 
-    windowed_sig = moving_window(raw_sig, fps=fps, window_size=1.6, increment=1/fps)
+    for n in range(0, N):
+        m = n - l + 1
+        if n - l + 1 > 0:
+            # Temporal normalization
+            Cn = np.array(raw_sig[m:n + 1]) / np.mean(np.array(raw_sig[m:n + 1]))
 
-    for enum, sig in enumerate(windowed_sig):
-        sig = np.array(sig)
-        sig = np.array([sig[:, i] for i in range(0, 3)])
+            # Projection
+            S1 = Cn[:, 1] - Cn[:, 2]
+            S2 = Cn[:, 1] + Cn[:, 2] - 2 * Cn[:, 0]
+            alpha = np.std(S1) / np.std(S2)
+            h = S1 + alpha * S2
 
-        # Spatial Averaging
-        mean_color = np.mean(sig, axis=1)
-
-        # Temporal normalization
-        diag_mean_color = np.diag(mean_color)
-        diag_mean_color_inv = np.linalg.inv(diag_mean_color)
-        Cn = np.matmul(diag_mean_color_inv, sig)
-
-        # Projection
-        S1 = Cn[1] - Cn[2]
-        S2 = Cn[1] + Cn[2] - 2 * Cn[0]
-        alpha = np.std(S1) / np.std(S2)
-        h = S1 + alpha * S2
-
-        # Overlap-Adding
-        H[enum:enum + l] = H[enum:enum + l] + (h - np.mean(h))
+            # Overlap-Adding
+            H[m:n + 1] += (h - np.mean(h))
 
     # Compute STFT
     noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -57,9 +49,13 @@ def pos_framework(input_video, dataset=None):
     # Detect Peaks for each time slice
     hr = []
     for i in range(magnitude_Zxx.shape[1]):
-        peaks, _ = find_peaks(magnitude_Zxx[:, i])
+        mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+        masked_frequencies = frequencies[mask]
+        masked_magnitude = magnitude_Zxx[mask, i]
+
+        peaks, _ = find_peaks(masked_magnitude)
         if len(peaks) > 0:
-            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+            peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
             hr.append(peak_freq * 60)
         else:
             hr.append(None)
@@ -128,8 +124,8 @@ def pos_ubfc2(ground_truth_file, sampling_frequency=30):
 # MAE = []
 pos_true = []
 pos_pred = []
-# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 for sub_folders in os.listdir(base_dir):
     if sub_folders == 'UBFC1':
         for folders in os.listdir(os.path.join(base_dir, sub_folders)):

@@ -119,7 +119,8 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             raw_sig.append([r, g, b])
 
         elif framework == 'POS':
-            b, g, r, a = cv2.mean(roi)
+            filtered_roi = simple_skin_selection(roi)
+            b, g, r, a = cv2.mean(filtered_roi)
             raw_sig.append([r, g, b])
 
         elif framework == 'ICA':
@@ -230,7 +231,7 @@ def extract_raw_bg_signal(input_video, color='g'):
     raw_bg_sig = []
 
     # model_path = 'Necessary_Files\\selfie_segmenter_landscape.tflite'
-    model_path = 'C:\\Users\\Admin\\PycharmProjects\\pythonProject2\\remote_PPG\\Necessary_Files\\selfie_segmenter_landscape.tflite'
+    model_path = r'C:\Users\ilyas\PycharmProjects\pythonProject1\remote_PPG\Necessary_Files\selfie_segmenter_landscape.tflite'
 
     BaseOptions = mp.tasks.BaseOptions
     ImageSegmenter = mp.tasks.vision.ImageSegmenter
