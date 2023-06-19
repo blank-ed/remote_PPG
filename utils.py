@@ -49,7 +49,10 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
     mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
                                                    min_detection_confidence=0.5)
-    face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
+
+    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'remote_PPG', 'Necessary_Files', 'haarcascade_frontalface_default.xml')
+    face_cascade = cv2.CascadeClassifier(file_path)
+
     face_coordinates_prev = None
     mp_coordinates_prev = None
     frame_count = 0
@@ -60,8 +63,8 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5, minSize=(30, 30))
 
-        # Look through the first 30 frames until face is detected
-        if len(faces) == 0 and frame_count <= 30:
+        # Look through the first 200 frames until face is detected
+        if len(faces) == 0 and frame_count <= 200:
             continue
 
         if (len(faces) == 0 or len(faces) > 1) and face_coordinates_prev is not None:
@@ -231,7 +234,8 @@ def extract_raw_bg_signal(input_video, color='g'):
     raw_bg_sig = []
 
     # model_path = 'Necessary_Files\\selfie_segmenter_landscape.tflite'
-    model_path = r'C:\Users\ilyas\PycharmProjects\pythonProject1\remote_PPG\Necessary_Files\selfie_segmenter_landscape.tflite'
+    model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'remote_PPG', 'Necessary_Files', 'selfie_segmenter_landscape.tflite')
+    # model_path = r'C:\Users\ilyas\PycharmProjects\pythonProject1\remote_PPG\Necessary_Files\selfie_segmenter_landscape.tflite'
 
     BaseOptions = mp.tasks.BaseOptions
     ImageSegmenter = mp.tasks.vision.ImageSegmenter

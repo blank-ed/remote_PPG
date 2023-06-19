@@ -47,9 +47,11 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
         fps = get_fps(input_video)  # find the fps of the video
     elif dataset == 'UBFC1' or dataset == 'UBFC2':
         fps = 30
+    elif dataset == 'LGI_PPGI':
+        fps = 25
     else:
         assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
-                      "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+                      "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
     if len(raw_green_sig) != len(raw_bg_green_signal):
         raw_bg_green_signal = raw_bg_green_signal[abs(len(raw_green_sig)-len(raw_bg_green_signal)):]
@@ -70,7 +72,7 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
         hr = []
 
         for each_signal_window in windowed_pulse_sig:
-            frequencies, psd = welch(each_signal_window, fs=fps, nperseg=256, nfft=2048)
+            frequencies, psd = welch(each_signal_window, fs=fps, nperseg=len(each_signal_window), nfft=4096)
 
             first = np.where(frequencies > 0.7)[0]
             last = np.where(frequencies < 4)[0]
@@ -82,7 +84,7 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
             hr.append(f_max * 60.0)
 
     elif heart_rate_calculation_mode == 'average':
-        frequencies, psd = welch(bp_filtered, fs=fps, nperseg=256, nfft=2048)
+        frequencies, psd = welch(bp_filtered, fs=fps, nperseg=512, nfft=4096)
 
         first = np.where(frequencies > 0.7)[0]
         last = np.where(frequencies < 4)[0]
@@ -272,7 +274,7 @@ def licvpr_ubfc1(ground_truth_file, heart_rate_calculation_mode='average', sampl
         hrGT = []
 
         for each_signal_window in windowed_pulse_sig:
-            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=256, nfft=2048)
+            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=len(each_signal_window), nfft=4096)
 
             first = np.where(frequencies > 0.7)[0]
             last = np.where(frequencies < 4)[0]
@@ -284,7 +286,7 @@ def licvpr_ubfc1(ground_truth_file, heart_rate_calculation_mode='average', sampl
             hrGT.append(f_max * 60.0)
 
     elif heart_rate_calculation_mode == 'average':
-        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=256, nfft=2048)
+        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=512, nfft=4096)
 
         first = np.where(frequencies > 0.7)[0]
         last = np.where(frequencies < 4)[0]
@@ -322,7 +324,7 @@ def licvpr_ubfc2(ground_truth_file, heart_rate_calculation_mode='average', sampl
         hrGT = []
 
         for each_signal_window in windowed_pulse_sig:
-            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=256, nfft=2048)
+            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=len(each_signal_window), nfft=4096)
 
             first = np.where(frequencies > 0.7)[0]
             last = np.where(frequencies < 4)[0]
@@ -334,7 +336,57 @@ def licvpr_ubfc2(ground_truth_file, heart_rate_calculation_mode='average', sampl
             hrGT.append(f_max * 60.0)
 
     elif heart_rate_calculation_mode == 'average':
-        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=256, nfft=2048)
+        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=512, nfft=4096)
+
+        first = np.where(frequencies > 0.7)[0]
+        last = np.where(frequencies < 4)[0]
+        first_index = first[0]
+        last_index = last[-1]
+        range_of_interest = range(first_index, last_index + 1, 1)
+        max_idx = np.argmax(psd[range_of_interest])
+        f_max = frequencies[range_of_interest[max_idx]]
+        hrGT = f_max * 60.0
+
+    else:
+        assert False, "Invalid heart rate calculation mode type. Please choose one of the valid available types " \
+                       "types: 'continuous', or 'average' "
+
+    return hrGT
+
+
+def licvpr_lgi_ppgi(ground_truth_file, heart_rate_calculation_mode='average', sampling_frequency=60, hr_interval=None):
+    gtdata = pd.read_xml(ground_truth_file)
+    gtTime = (gtdata.iloc[:, 0]).tolist()
+    gtHR = gtdata.iloc[:, 1].tolist()
+    gtTrace = gtdata.iloc[:, 2].tolist()
+
+    if hr_interval is None:
+        hr_interval = 10
+
+    # Filter the signal using detrending, moving average and bandpass filter
+    detrended = detrending_filter(signal=np.array(gtTrace), Lambda=300)
+    moving_average = moving_average_filter(signal=detrended, window_size=3)
+    bp_filtered = fir_bp_filter(moving_average, fps=sampling_frequency, low=0.7, high=4)
+
+    if heart_rate_calculation_mode == 'continuous':
+        windowed_pulse_sig = moving_window(sig=bp_filtered, fps=sampling_frequency, window_size=hr_interval,
+                                           increment=hr_interval)
+        hrGT = []
+
+        for each_signal_window in windowed_pulse_sig:
+            frequencies, psd = welch(each_signal_window, fs=sampling_frequency, nperseg=len(each_signal_window), nfft=4096)
+
+            first = np.where(frequencies > 0.7)[0]
+            last = np.where(frequencies < 4)[0]
+            first_index = first[0]
+            last_index = last[-1]
+            range_of_interest = range(first_index, last_index + 1, 1)
+            max_idx = np.argmax(psd[range_of_interest])
+            f_max = frequencies[range_of_interest[max_idx]]
+            hrGT.append(f_max * 60.0)
+
+    elif heart_rate_calculation_mode == 'average':
+        frequencies, psd = welch(bp_filtered, fs=sampling_frequency, nperseg=512, nfft=4096)
 
         first = np.where(frequencies > 0.7)[0]
         last = np.where(frequencies < 4)[0]
@@ -357,19 +409,19 @@ import ast
 licvpr_true = []
 licvpr_pred = []
 # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
-
-raw_bg_signals_ubfc1 = []
-with open('UBFC1.txt', 'r') as f:
-    lines = f.readlines()
-    for x in lines:
-        raw_bg_signals_ubfc1.append(ast.literal_eval(x))
-
-raw_bg_signals_ubfc2 = []
-with open('UBFC2.txt', 'r') as f:
-    lines = f.readlines()
-    for x in lines:
-        raw_bg_signals_ubfc2.append(ast.literal_eval(x))
+# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+#
+# raw_bg_signals_ubfc1 = []
+# with open('UBFC1.txt', 'r') as f:
+#     lines = f.readlines()
+#     for x in lines:
+#         raw_bg_signals_ubfc1.append(ast.literal_eval(x))
+#
+# raw_bg_signals_ubfc2 = []
+# with open('UBFC2.txt', 'r') as f:
+#     lines = f.readlines()
+#     for x in lines:
+#         raw_bg_signals_ubfc2.append(ast.literal_eval(x))
 
 # # raw_bg_signal_ubfc1 = []
 # raw_bg_signal_ubfc2 = []
@@ -404,55 +456,114 @@ with open('UBFC2.txt', 'r') as f:
 #     f.write('\n')
 
 
+# for sub_folders in os.listdir(base_dir):
+#     if sub_folders == 'UBFC1':
+#         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.xmp'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#
+#             # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
+#             hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc1[enum],
+#                                     heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC1')
+#             hrGT = licvpr_ubfc1(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=60,
+#                                 hr_interval=None)
+#             # print(len(hrGT), len(hrES))
+#             print('')
+#             licvpr_true.append(np.mean(hrGT))
+#             licvpr_pred.append(np.mean(hrES))
+#
+#     elif sub_folders == 'UBFC2':
+#         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.txt'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#             # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
+#             hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
+#                                     heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
+#             hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
+#                                 hr_interval=None)
+#             # print(len(hrGT), len(hrES))
+#             print('')
+#             licvpr_true.append(np.mean(hrGT))
+#             licvpr_pred.append(np.mean(hrES))
+#
+# print(licvpr_true)
+# print(licvpr_pred)
+# print(mean_absolute_error(licvpr_true, licvpr_pred))
+# print(mean_absolute_error(licvpr_true[8:], licvpr_pred[8:]))
+#
+# [75.68359375, 79.1015625, 91.015625, 61.962890625, 69.08203125, 73.046875, 90.4296875, 106.75330528846153, 107.373046875, 97.9248046875, 107.2265625, 98.2177734375, 112.75111607142857, 109.04715401785714, 110.67940848214286, 124.23967633928571, 68.80580357142857, 107.97991071428571, 75.33482142857143, 115.32505580357143, 93.98018973214286, 86.07003348214286, 120.47293526785714, 125.80915178571429, 102.392578125, 65.91796875, 106.28487723214286, 115.224609375, 99.4921875, 115.048828125, 98.56305803571429, 78.59933035714286, 106.03376116071429, 114.50892857142857, 114.697265625, 104.33872767857143, 117.83621651785714, 60.707310267857146, 110.7421875, 84.814453125, 85.88169642857143, 101.45089285714286, 94.04296875, 99.06529017857143, 82.74274553571429, 109.48660714285714, 97.74693080357143, 110.17717633928571, 90.52734375, 88.01618303571429]
+# [70.587158203125, 84.759521484375, 83.38623046875, 82.30329241071429, 74.267578125, 88.5498046875, 96.624755859375, 91.96555397727273, 95.09765625, 97.705078125, 108.193359375, 86.484375, 67.17354910714286, 97.74693080357143, 69.81026785714286, 75.83705357142857, 78.28543526785714, 92.97572544642857, 75.20926339285714, 75.89983258928571, 83.55887276785714, 92.47349330357143, 77.46930803571429, 104.58984375, 110.86774553571429, 87.57672991071429, 78.41099330357143, 89.736328125, 91.93359375, 72.421875, 83.99832589285714, 77.21819196428571, 81.04771205357143, 79.541015625, 76.27650669642857, 85.50502232142857, 94.29408482142857, 113.1591796875, 78.662109375, 105.59430803571429, 103.39704241071429, 72.38420758928571, 83.935546875, 100.38364955357143, 93.310546875, 74.76981026785714, 67.36188616071429, 97.18191964285714, 92.59905133928571, 95.17299107142857]
+# 18.96827525501842
+# 20.667101801658163
+
+# raw_bg_signal_lgi_ppgi = []
+# base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
+# for sub_folders in os.listdir(base_dir):
+#     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#         subjects = os.path.join(base_dir, sub_folders, folders)
+#         for each_subject in os.listdir(subjects):
+#             if each_subject.endswith('.avi'):
+#                 vid = os.path.join(subjects, each_subject)
+#                 print(vid)
+#                 bg_sig = extract_raw_bg_signal(input_video=vid)
+#                 print(bg_sig)
+#                 raw_bg_signal_lgi_ppgi.append(bg_sig)
+#
+# print(raw_bg_signal_lgi_ppgi)
+# with open('LGI_PPGI.txt', 'w') as f:
+#     f.write(str(raw_bg_signal_lgi_ppgi))
+#     f.write('\n')
+
+raw_bg_signals_lgi_ppgi = []
+with open('LGI_PPGI.txt', 'r') as f:
+    lines = f.readlines()
+    for x in lines:
+        raw_bg_signals_lgi_ppgi.append(ast.literal_eval(x))
+
+i = 0
+base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
 for sub_folders in os.listdir(base_dir):
-    if sub_folders == 'UBFC1':
-        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                if each_subject.endswith('.avi'):
-                    vid = os.path.join(subjects, each_subject)
-                elif each_subject.endswith('.xmp'):
-                    gt = os.path.join(subjects, each_subject)
-
-            print(vid, gt)
-
-            # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
-            hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc1[enum],
-                                    heart_rate_calculation_mode='average', hr_interval=None, dataset='UBFC1')
-            hrGT = licvpr_ubfc1(ground_truth_file=gt, heart_rate_calculation_mode='average', sampling_frequency=60,
-                                hr_interval=None)
-            # print(len(hrGT), len(hrES))
-            print('')
-            licvpr_true.append(np.mean(hrGT))
-            licvpr_pred.append(np.mean(hrES))
-
-    elif sub_folders == 'UBFC2':
-        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                if each_subject.endswith('.avi'):
-                    vid = os.path.join(subjects, each_subject)
-                elif each_subject.endswith('.txt'):
-                    gt = os.path.join(subjects, each_subject)
-
-            print(vid, gt)
-            # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
-            hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
-                                    heart_rate_calculation_mode='average', hr_interval=None, dataset='UBFC2')
-            hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='average', sampling_frequency=30,
-                                hr_interval=None)
-            # print(len(hrGT), len(hrES))
-            print('')
-            licvpr_true.append(np.mean(hrGT))
-            licvpr_pred.append(np.mean(hrES))
+    for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+        subjects = os.path.join(base_dir, sub_folders, folders)
+        for each_subject in os.listdir(subjects):
+            if each_subject.endswith('.avi'):
+                vid = os.path.join(subjects, each_subject)
+            elif each_subject.endswith('cms50_stream_handler.xml'):
+                gt = os.path.join(subjects, each_subject)
+        print(vid, gt)
+        hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_lgi_ppgi[i],
+                                heart_rate_calculation_mode='continuous', hr_interval=None, dataset='LGI_PPGI')
+        hrGT = licvpr_lgi_ppgi(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
+                            hr_interval=None)
+        print('')
+        licvpr_true.append(np.mean(hrGT))
+        licvpr_pred.append(np.mean(hrES))
+        i += 1
 
 print(licvpr_true)
 print(licvpr_pred)
 print(mean_absolute_error(licvpr_true, licvpr_pred))
-print(mean_absolute_error(licvpr_true[8:], licvpr_pred[8:]))
+print(f"gym: {mean_absolute_error(licvpr_true[0:6], licvpr_pred[0:6])}")
+print(f"resting: {mean_absolute_error(licvpr_true[6:12], licvpr_pred[6:12])}")
+print(f"rotation: {mean_absolute_error(licvpr_true[12:18], licvpr_pred[12:18])}")
+print(f"talk: {mean_absolute_error(licvpr_true[18:24], licvpr_pred[18:24])}")
 
-true = [75.5859375, 79.1015625, 91.40625, 61.5234375, 68.5546875, 73.828125, 89.6484375, 105.46875, 109.86328125, 94.04296875, 113.37890625, 99.31640625, 113.37890625, 108.10546875, 117.7734375, 125.68359375, 68.5546875, 111.62109375, 72.0703125, 116.015625, 94.04296875, 87.01171875, 126.5625, 132.71484375, 105.46875, 67.67578125, 94.04296875, 114.2578125, 99.31640625, 113.37890625, 100.1953125, 78.22265625, 115.13671875, 116.89453125, 116.015625, 115.13671875, 122.16796875, 61.5234375, 109.86328125, 84.375, 87.890625, 100.1953125, 97.55859375, 100.1953125, 80.859375, 111.62109375, 93.1640625, 109.86328125, 90.52734375, 87.01171875]
-pred = [59.765625, 70.3125, 67.67578125, 64.16015625, 74.70703125, 79.98046875, 80.859375, 89.6484375, 103.7109375, 72.94921875, 87.01171875, 101.07421875, 63.28125, 70.3125, 77.34375, 84.375, 86.1328125, 67.67578125, 68.5546875, 72.0703125, 69.43359375, 64.16015625, 60.64453125, 72.94921875, 102.83203125, 64.16015625, 54.4921875, 108.984375, 58.0078125, 88.76953125, 59.765625, 59.765625, 65.91796875, 57.12890625, 63.28125, 136.23046875, 67.67578125, 96.6796875, 65.0390625, 69.43359375, 75.5859375, 61.5234375, 69.43359375, 76.46484375, 72.94921875, 61.5234375, 66.796875, 99.31640625, 86.1328125, 60.64453125]
-
-# 26.630859375
-# 29.610770089285715
+# [65.27235243055556, 63.01491477272727, 60.64453125, 66.08807963709677, 63.69485294117647, 67.37116033380681, 65.863037109375, 60.83286830357143, 60.0677490234375, 78.955078125, 72.91782924107143, 53.466796875, 68.9666748046875, 69.52776227678571, 61.083984375, 83.73046875, 75.3515625, 55.496651785714285, 73.20363898026316, 63.515625, 77.60225183823529, 87.94232536764706, 77.1514892578125, 78.94646139705883]
+# [81.26027960526316, 94.70687373991936, 71.59423828125, 100.75851966594827, 77.20184326171875, 92.3655440167683, 80.9783935546875, 107.40443638392857, 84.64704241071429, 81.87430245535714, 130.68498883928572, 46.718052455357146, 86.24267578125, 58.384486607142854, 82.4432373046875, 98.61537388392857, 71.09723772321429, 60.738699776785715, 74.78841145833333, 91.34347098214286, 70.7244873046875, 82.3974609375, 82.672119140625, 90.6829833984375]
+# 17.448123343851805
+# gym: 21.966901200917494
+# resting: 25.61689104352679
+# rotation: 12.359967912946425
+# talk: 9.848733218016507

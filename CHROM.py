@@ -76,9 +76,11 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
             fps = get_fps(input_video)  # find the fps of the video
         elif dataset == 'UBFC1' or dataset == 'UBFC2':
             fps = 30
+        elif dataset == 'LGI_PPGI':
+            fps = 25
         else:
             assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
-                          "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+                          "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
         N = len(raw_sig)
         H = np.zeros(N)
@@ -268,50 +270,140 @@ def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
     return hrGT
 
 
-# MAE = []
+def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
+    gtdata = pd.read_xml(ground_truth_file)
+    gtTime = (gtdata.iloc[:, 0]).tolist()
+    gtHR = gtdata.iloc[:, 1].tolist()
+    gtTrace = gtdata.iloc[:, 2].tolist()
+
+    N = len(gtTrace)
+    H = np.zeros(N)
+    l = int(sampling_frequency * 1.6)
+
+    window = moving_window(gtTrace, fps=sampling_frequency, window_size=1.6, increment=0.8)
+
+    for enum, each_window in enumerate(window):
+        normalized = np.array(each_window) / np.mean(each_window)
+
+        # bandpass filter Xs and Ys here
+        filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
+
+        SWin = np.multiply(filtered, windows.hann(len(filtered)))
+
+        start = enum * (l // 2)
+        end = enum * (l // 2) + l
+
+        if end > len(gtTrace):
+            H[len(gtTrace) - l:len(gtTrace)] = H[len(gtTrace) - l:len(gtTrace)] + SWin
+        else:
+            H[start:end] = H[start:end] + SWin
+
+    # Compute STFT
+    noverlap = sampling_frequency * (
+                12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
+
+    frequencies, times, Zxx = stft(H, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+
+    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    # Detect Peaks for each time slice
+    hrGT = []
+    for i in range(magnitude_Zxx.shape[1]):
+        peaks, _ = find_peaks(magnitude_Zxx[:, i])
+        if len(peaks) > 0:
+            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+            hrGT.append(peak_freq * 60)
+        else:
+            hrGT.append(None)
+
+    return hrGT
+
+
 chrom_true = []
 chrom_pred = []
 # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# for sub_folders in os.listdir(base_dir):
+#     if sub_folders == 'UBFC1':
+#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.xmp'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#             hrES = chrom_framework(input_video=vid, dataset='UBFC1')
+#             hrGT = chrom_ubfc1(ground_truth_file=gt)
+#             print(len(hrGT), len(hrES))
+#             print('')
+#             chrom_true.append(np.mean(hrGT))
+#             chrom_pred.append(np.mean(hrES))
+#
+#     elif sub_folders == 'UBFC2':
+#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.txt'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#             hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+#             hrGT = chrom_ubfc2(ground_truth_file=gt)
+#             print(len(hrGT), len(hrES))
+#             print('')
+#             chrom_true.append(np.mean(hrGT))
+#             chrom_pred.append(np.mean(hrES))
+
+# print(chrom_true)
+# print(chrom_pred)
+# print(mean_absolute_error(chrom_true, chrom_pred))
+# print(mean_absolute_error(chrom_true[8:], chrom_pred[8:]))
+
+# [73.98876404494382, 67.32954545454545, 44.48275862068966, 58.97435897435897, 68.80434782608695, 72.41176470588235, 59.43181818181818, 48.53658536585366, 46.22641509433962, 45.725806451612904, 48.61702127659574, 45.37735849056604, 52.46376811594203, 45.65217391304348, 44.05797101449275, 50.36231884057971, 48.529411764705884, 72.97101449275362, 51.029411764705884, 46.30434782608695, 51.357142857142854, 49.0, 46.52173913043478, 49.34782608695652, 46.44927536231884, 47.76119402985075, 45.0, 47.5, 45.588235294117645, 43.775510204081634, 47.7536231884058, 46.44927536231884, 53.11594202898551, 50.36764705882353, 43.91304347826087, 48.0, 42.357142857142854, 55.65217391304348, 47.642857142857146, 69.92753623188406, 45.36231884057971, 50.289855072463766, 47.214285714285715, 48.8235294117647, 48.6231884057971, 46.30434782608695, 46.76470588235294, 45.36231884057971, 44.701492537313435, 53.26086956521739]
+# [49.02439024390244, 52.407407407407405, 47.4375, 55.486111111111114, 62.73809523809524, 55.0, 49.629629629629626, 47.58771929824562, 47.35849056603774, 49.83870967741935, 57.12765957446808, 47.924528301886795, 43.98550724637681, 52.46376811594203, 48.84057971014493, 45.289855072463766, 55.588235294117645, 54.492753623188406, 47.5, 61.01449275362319, 50.07142857142857, 48.785714285714285, 48.55072463768116, 51.73913043478261, 44.20289855072464, 56.56716417910448, 50.0735294117647, 42.0, 48.8235294117647, 48.06122448979592, 48.69565217391305, 49.05797101449275, 48.55072463768116, 46.69117647058823, 45.869565217391305, 49.285714285714285, 49.42857142857143, 46.125, 56.5, 63.47826086956522, 52.2463768115942, 43.768115942028984, 54.714285714285715, 53.01470588235294, 52.82608695652174, 41.52173913043478, 54.55882352941177, 58.11594202898551, 52.53731343283582, 60.79710144927536]
+# 6.35584093698124
+# 5.648416043920325
+
+base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
 for sub_folders in os.listdir(base_dir):
-    if sub_folders == 'UBFC1':
-        for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                if each_subject.endswith('.avi'):
-                    vid = os.path.join(subjects, each_subject)
-                elif each_subject.endswith('.xmp'):
-                    gt = os.path.join(subjects, each_subject)
+    for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+        subjects = os.path.join(base_dir, sub_folders, folders)
+        for each_subject in os.listdir(subjects):
+            if each_subject.endswith('.avi'):
+                vid = os.path.join(subjects, each_subject)
+            elif each_subject.endswith('cms50_stream_handler.xml'):
+                gt = os.path.join(subjects, each_subject)
 
-            print(vid, gt)
-            hrES = chrom_framework(input_video=vid, dataset='UBFC1')
-            hrGT = chrom_ubfc1(ground_truth_file=gt)
-            print(len(hrGT), len(hrES))
-            print('')
-            chrom_true.append(np.mean(hrGT))
-            chrom_pred.append(np.mean(hrES))
-
-    elif sub_folders == 'UBFC2':
-        for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                if each_subject.endswith('.avi'):
-                    vid = os.path.join(subjects, each_subject)
-                elif each_subject.endswith('.txt'):
-                    gt = os.path.join(subjects, each_subject)
-
-            print(vid, gt)
-            hrES = chrom_framework(input_video=vid, dataset='UBFC2')
-            hrGT = chrom_ubfc2(ground_truth_file=gt)
-            print(len(hrGT), len(hrES))
-            print('')
-            chrom_true.append(np.mean(hrGT))
-            chrom_pred.append(np.mean(hrES))
+        print(vid, gt)
+        hrES = chrom_framework(input_video=vid, dataset='LGI_PPGI')
+        hrGT = chrom_lgi_ppgi(ground_truth_file=gt)
+        print(len(hrGT), len(hrES))
+        print('')
+        chrom_true.append(np.mean(hrGT))
+        chrom_pred.append(np.mean(hrES))
 
 print(chrom_true)
 print(chrom_pred)
 print(mean_absolute_error(chrom_true, chrom_pred))
-print(mean_absolute_error(chrom_true[6:], chrom_pred[6:]))
+print(f"gym: {mean_absolute_error(chrom_true[0:6], chrom_pred[0:6])}")
+print(f"resting: {mean_absolute_error(chrom_true[6:12], chrom_pred[6:12])}")
+print(f"rotation: {mean_absolute_error(chrom_true[12:18], chrom_pred[12:18])}")
+print(f"talk: {mean_absolute_error(chrom_true[18:24], chrom_pred[18:24])}")
+
+
+# [55.63275434243176, 50.825688073394495, 48.361702127659576, 50.53225806451613, 47.1764705882353, 52.31818181818182, 63.63636363636363, 54.857142857142854, 59.09090909090909, 72.33333333333333, 74.20289855072464, 43.46666666666667, 68.60759493670886, 52.82608695652174, 58.705882352941174, 65.06666666666666, 72.01388888888889, 43.16901408450704, 72.60416666666667, 56.2, 68.6470588235294, 58.71951219512195, 70.625, 70.05952380952381]
+# [56.381909547738694, 53.591331269349844, 47.56637168141593, 50.06535947712418, 51.109422492401215, 51.585648148148145, 50.0, 51.470588235294116, 52.770270270270274, 62.19178082191781, 55.833333333333336, 29.86111111111111, 52.36842105263158, 52.08955223880597, 47.4390243902439, 51.875, 65.79710144927536, 33.405797101449274, 54.21052631578947, 54.189189189189186, 56.103896103896105, 54.074074074074076, 55.57692307692308, 51.626506024096386]
+# 8.474630322375537
+# gym: 1.5737521681829112
+# resting: 10.910038393868929
+# rotation: 9.56903960897138
+# talk: 11.845691118478923
+
 
 ### END TEST SECTION
 
