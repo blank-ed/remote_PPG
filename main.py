@@ -70,6 +70,41 @@ def chrom_test(raw_sig):
     return hr
 
 
+def chrom_test_2(raw_sig):
+
+    normalized_signal = (np.array(raw_sig) - np.mean(raw_sig)) / np.std(raw_sig)
+    normalized = [normalized_signal[:, i] for i in range(0, 3)]
+
+    b, a = butter(4, Wn=[0.67, 4.0], fs=30, btype='bandpass')
+    filtered = np.array([filtfilt(b, a, x) for x in normalized])
+    transposed_list = list(map(list, zip(*filtered)))
+
+    window = moving_window(transposed_list, fps=30, window_size=10, increment=1)
+    hr = []
+    for enum, each_window in enumerate(window):
+
+        # Build two orthogonal chrominance signals
+        Xs = 3 * np.array(each_window)[:,0] - 2 * np.array(each_window)[:,1]
+        Ys = 1.5 * np.array(each_window)[:,0] + np.array(each_window)[:,1] - 1.5 * np.array(each_window)[:,2]
+
+        alpha = np.std(Xs) / np.std(Ys)
+        S = Xs - alpha * Ys
+
+        filtered_S = filtfilt(b, a, S)
+        frequencies, psd = welch(filtered_S, fs=30, nperseg=len(S), nfft=4096)
+
+        first = np.where(frequencies > 0.67)[0]
+        last = np.where(frequencies < 4)[0]
+        first_index = first[0]
+        last_index = last[-1]
+        range_of_interest = range(first_index, last_index + 1, 1)
+        max_idx = np.argmax(psd[range_of_interest])
+        f_max = frequencies[range_of_interest[max_idx]]
+        hr.append(f_max * 60.0)
+
+    return hr
+
+
 def pos_test(raw_sig):
     fps = 30
 
@@ -194,14 +229,15 @@ def ica_test(raw_sig):
 
 
 raw_sig = []
-with open('raw_ica_sig.txt', 'r') as f:
+with open('raw_chrom_sig_new.txt', 'r') as f:
     read = f.readlines()
     for x in read:
         raw_sig.append(ast.literal_eval(x))
 
 true = []
 pred = []
-base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 for sub_folders in os.listdir(base_dir):
     if sub_folders == 'UBFC2':
         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
@@ -209,21 +245,33 @@ for sub_folders in os.listdir(base_dir):
             for each_subject in os.listdir(subjects):
                 # if each_subject.endswith('.avi'):
                 #     print(enum)
-                #     raw_sig = extract_raw_sig(os.path.join(subjects, each_subject), framework='ICA', width=0.6, height=1)
-                #     with open('raw_ica_sig.txt', 'a') as f:
+                #     raw_sig = extract_raw_sig(os.path.join(subjects, each_subject), framework='GREEN', ROI_type='ROI_I')
+                #     with open('green_forehead_sig.txt', 'a') as f:
                 #         f.write(str(raw_sig))
                 #         f.write('\n')
                 if each_subject.endswith('.txt'):
                     gt = os.path.join(subjects, each_subject)
                     print(enum, gt)
-                    hrGT = ica_ubfc2(ground_truth_file=gt)
+                    hrGT = chrom_ubfc2(ground_truth_file=gt)
 
                     raw_signal = raw_sig[enum]
-                    hrES = ica_test(raw_signal)
+                    hrES = chrom_test_2(raw_signal)
+                    # print(len(hrGT), len(hrES))
 
                     true.append(np.mean(hrGT))
                     pred.append(np.mean(hrES))
 
+data = {'hrGT': true, 'hrES': pred}
+df = pd.DataFrame(data)
+df['moving_median_GT'] = df['hrGT'].rolling(window=9).mean()
+df['moving_median_ES'] = df['hrES'].rolling(window=9).mean()
+moving_median_GT = [x for x in df['moving_median_GT'].tolist() if ~np.isnan(x)]
+moving_median_ES = [x for x in df['moving_median_ES'].tolist() if ~np.isnan(x)]
+
 print(true)
 print(pred)
 print(mean_absolute_error(true, pred))
+
+print(moving_median_GT)
+print(moving_median_ES)
+print(mean_absolute_error(moving_median_GT, moving_median_ES))

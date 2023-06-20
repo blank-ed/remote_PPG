@@ -230,34 +230,16 @@ def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
     gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
     gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
 
-    N = len(gtTrace)
-    H = np.zeros(N)
-    l = int(sampling_frequency * 1.6)
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
 
-    window = moving_window(gtTrace, fps=sampling_frequency, window_size=1.6, increment=0.8)
-
-    for enum, each_window in enumerate(window):
-        normalized = np.array(each_window) / np.mean(each_window)
-
-        # bandpass filter Xs and Ys here
-        filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
-
-        SWin = np.multiply(filtered, windows.hann(len(filtered)))
-
-        start = enum * (l // 2)
-        end = enum * (l // 2) + l
-
-        if end > len(gtTrace):
-            H[len(gtTrace) - l:len(gtTrace)] = H[len(gtTrace) - l:len(gtTrace)] + SWin
-        else:
-            H[start:end] = H[start:end] + SWin
+    # bandpass filter Xs and Ys here
+    filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
-    noverlap = sampling_frequency * (
-                12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(H, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    frequencies, times, Zxx = stft(filtered, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -408,6 +390,10 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
 # resting: 10.910038393868929
 # rotation: 9.56903960897138
 # talk: 11.845691118478923
+
+
+
+
 
 
 ### END TEST SECTION
