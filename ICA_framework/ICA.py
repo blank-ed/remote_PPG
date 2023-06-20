@@ -360,31 +360,31 @@ ica_pred = []
 # 11.878977160036426
 
 # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
-base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\LGI-PPG Dataset'
-for sub_folders in os.listdir(base_dir):
-    for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-        subjects = os.path.join(base_dir, sub_folders, folders)
-        for each_subject in os.listdir(subjects):
-            if each_subject.endswith('.avi'):
-                vid = os.path.join(subjects, each_subject)
-            elif each_subject.endswith('cms50_stream_handler.xml'):
-                gt = os.path.join(subjects, each_subject)
-
-        print(vid, gt)
-        hrES = ica_framework(input_video=vid, dataset='LGI_PPGI')
-        hrGT = ica_lgi_ppgi(ground_truth_file=gt)
-        print(len(hrGT), len(hrES))
-        print('')
-        ica_true.append(np.mean(hrGT))
-        ica_pred.append(np.mean(hrES))
-
-print(ica_true)
-print(ica_pred)
-print(mean_absolute_error(ica_true, ica_pred))
-print(f"gym: {mean_absolute_error(ica_true[0:6], ica_pred[0:6])}")
-print(f"resting: {mean_absolute_error(ica_true[6:12], ica_pred[6:12])}")
-print(f"rotation: {mean_absolute_error(ica_true[12:18], ica_pred[12:18])}")
-print(f"talk: {mean_absolute_error(ica_true[18:24], ica_pred[18:24])}")
+# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\LGI-PPG Dataset'
+# for sub_folders in os.listdir(base_dir):
+#     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#         subjects = os.path.join(base_dir, sub_folders, folders)
+#         for each_subject in os.listdir(subjects):
+#             if each_subject.endswith('.avi'):
+#                 vid = os.path.join(subjects, each_subject)
+#             elif each_subject.endswith('cms50_stream_handler.xml'):
+#                 gt = os.path.join(subjects, each_subject)
+#
+#         print(vid, gt)
+#         hrES = ica_framework(input_video=vid, dataset='LGI_PPGI')
+#         hrGT = ica_lgi_ppgi(ground_truth_file=gt)
+#         print(len(hrGT), len(hrES))
+#         print('')
+#         ica_true.append(np.mean(hrGT))
+#         ica_pred.append(np.mean(hrES))
+#
+# print(ica_true)
+# print(ica_pred)
+# print(mean_absolute_error(ica_true, ica_pred))
+# print(f"gym: {mean_absolute_error(ica_true[0:6], ica_pred[0:6])}")
+# print(f"resting: {mean_absolute_error(ica_true[6:12], ica_pred[6:12])}")
+# print(f"rotation: {mean_absolute_error(ica_true[12:18], ica_pred[12:18])}")
+# print(f"talk: {mean_absolute_error(ica_true[18:24], ica_pred[18:24])}")
 
 # [115.31367292225201, 110.38383838383838, 116.93658536585366, 119.10357142857143, 109.62258064516129, 102.69756097560976, 65.36170212765957, 60.925, 59.297872340425535, 77.15555555555555, 72.41025641025641, 52.4, 66.93877551020408, 57.48717948717949, 60.836363636363636, 82.97777777777777, 76.95238095238095, 50.97560975609756, 73.24242424242425, 62.06666666666667, 80.65454545454546, 87.42307692307692, 74.76, 78.66666666666667]
 # [90.59510869565217, 103.62116040955631, 68.50510204081633, 69.46014492753623, 78.52508361204013, 74.01741293532338, 67.37777777777778, 59.421052631578945, 62.40909090909091, 80.6046511627907, 78.66666666666667, 53.476190476190474, 67.17391304347827, 58.486486486486484, 78.5, 56.80952380952381, 64.17948717948718, 88.05128205128206, 71.03076923076924, 63.90909090909091, 69.14893617021276, 72.74509803921569, 70.25, 70.13207547169812]

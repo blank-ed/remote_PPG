@@ -41,9 +41,11 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
             fps = get_fps(input_video)  # find the fps of the video
         elif dataset == 'UBFC1' or dataset == 'UBFC2':
             fps = 30
+        elif dataset == 'LGI_PPGI':
+            fps = 25
         else:
             assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
-                         "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+                          "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
         selected_segment = raw_sig[i_s:i_s + segment_length]  # Select the segment with least inter frame motion
         normalized = normalize(selected_segment, framework='CHROM')  # Normalize the selected segment
@@ -111,6 +113,8 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
                 H[len(raw_sig)-l:len(raw_sig)] = H[len(raw_sig)-l:len(raw_sig)] + SWin
             else:
                 H[start:end] = H[start:end] + SWin
+
+        H = butterworth_bp_filter(H, fps=fps, low=0.67, high=2)  # MOD ---------------------------------------------
 
         # Compute STFT
         noverlap = fps*(12-1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -320,44 +324,44 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     return hrGT
 
 
-chrom_true = []
-chrom_pred = []
+# chrom_true = []
+# chrom_pred = []
 # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 # for sub_folders in os.listdir(base_dir):
-#     if sub_folders == 'UBFC1':
-#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-#             subjects = os.path.join(base_dir, sub_folders, folders)
-#             for each_subject in os.listdir(subjects):
-#                 if each_subject.endswith('.avi'):
-#                     vid = os.path.join(subjects, each_subject)
-#                 elif each_subject.endswith('.xmp'):
-#                     gt = os.path.join(subjects, each_subject)
-#
-#             print(vid, gt)
-#             hrES = chrom_framework(input_video=vid, dataset='UBFC1')
-#             hrGT = chrom_ubfc1(ground_truth_file=gt)
-#             print(len(hrGT), len(hrES))
-#             print('')
-#             chrom_true.append(np.mean(hrGT))
-#             chrom_pred.append(np.mean(hrES))
-#
-#     elif sub_folders == 'UBFC2':
-#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-#             subjects = os.path.join(base_dir, sub_folders, folders)
-#             for each_subject in os.listdir(subjects):
-#                 if each_subject.endswith('.avi'):
-#                     vid = os.path.join(subjects, each_subject)
-#                 elif each_subject.endswith('.txt'):
-#                     gt = os.path.join(subjects, each_subject)
-#
-#             print(vid, gt)
-#             hrES = chrom_framework(input_video=vid, dataset='UBFC2')
-#             hrGT = chrom_ubfc2(ground_truth_file=gt)
-#             print(len(hrGT), len(hrES))
-#             print('')
-#             chrom_true.append(np.mean(hrGT))
-#             chrom_pred.append(np.mean(hrES))
+    # if sub_folders == 'UBFC1':
+    #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+    #         subjects = os.path.join(base_dir, sub_folders, folders)
+    #         for each_subject in os.listdir(subjects):
+    #             if each_subject.endswith('.avi'):
+    #                 vid = os.path.join(subjects, each_subject)
+    #             elif each_subject.endswith('.xmp'):
+    #                 gt = os.path.join(subjects, each_subject)
+    #
+    #         print(vid, gt)
+    #         hrES = chrom_framework(input_video=vid, dataset='UBFC1')
+    #         hrGT = chrom_ubfc1(ground_truth_file=gt)
+    #         print(len(hrGT), len(hrES))
+    #         print('')
+    #         chrom_true.append(np.mean(hrGT))
+    #         chrom_pred.append(np.mean(hrES))
+
+    # if sub_folders == 'UBFC2':
+    #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+    #         subjects = os.path.join(base_dir, sub_folders, folders)
+    #         for each_subject in os.listdir(subjects):
+    #             if each_subject.endswith('.avi'):
+    #                 vid = os.path.join(subjects, each_subject)
+    #             elif each_subject.endswith('.txt'):
+    #                 gt = os.path.join(subjects, each_subject)
+    #
+    #         print(vid, gt)
+    #         hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+    #         hrGT = chrom_ubfc2(ground_truth_file=gt)
+    #         print(len(hrGT), len(hrES))
+    #         print('')
+    #         chrom_true.append(np.mean(hrGT))
+    #         chrom_pred.append(np.mean(hrES))
 
 # print(chrom_true)
 # print(chrom_pred)
@@ -366,34 +370,35 @@ chrom_pred = []
 
 # [73.98876404494382, 67.32954545454545, 44.48275862068966, 58.97435897435897, 68.80434782608695, 72.41176470588235, 59.43181818181818, 48.53658536585366, 46.22641509433962, 45.725806451612904, 48.61702127659574, 45.37735849056604, 52.46376811594203, 45.65217391304348, 44.05797101449275, 50.36231884057971, 48.529411764705884, 72.97101449275362, 51.029411764705884, 46.30434782608695, 51.357142857142854, 49.0, 46.52173913043478, 49.34782608695652, 46.44927536231884, 47.76119402985075, 45.0, 47.5, 45.588235294117645, 43.775510204081634, 47.7536231884058, 46.44927536231884, 53.11594202898551, 50.36764705882353, 43.91304347826087, 48.0, 42.357142857142854, 55.65217391304348, 47.642857142857146, 69.92753623188406, 45.36231884057971, 50.289855072463766, 47.214285714285715, 48.8235294117647, 48.6231884057971, 46.30434782608695, 46.76470588235294, 45.36231884057971, 44.701492537313435, 53.26086956521739]
 # [49.02439024390244, 52.407407407407405, 47.4375, 55.486111111111114, 62.73809523809524, 55.0, 49.629629629629626, 47.58771929824562, 47.35849056603774, 49.83870967741935, 57.12765957446808, 47.924528301886795, 43.98550724637681, 52.46376811594203, 48.84057971014493, 45.289855072463766, 55.588235294117645, 54.492753623188406, 47.5, 61.01449275362319, 50.07142857142857, 48.785714285714285, 48.55072463768116, 51.73913043478261, 44.20289855072464, 56.56716417910448, 50.0735294117647, 42.0, 48.8235294117647, 48.06122448979592, 48.69565217391305, 49.05797101449275, 48.55072463768116, 46.69117647058823, 45.869565217391305, 49.285714285714285, 49.42857142857143, 46.125, 56.5, 63.47826086956522, 52.2463768115942, 43.768115942028984, 54.714285714285715, 53.01470588235294, 52.82608695652174, 41.52173913043478, 54.55882352941177, 58.11594202898551, 52.53731343283582, 60.79710144927536]
+
 # 6.35584093698124
 # 5.648416043920325
 
-base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
-for sub_folders in os.listdir(base_dir):
-    for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-        subjects = os.path.join(base_dir, sub_folders, folders)
-        for each_subject in os.listdir(subjects):
-            if each_subject.endswith('.avi'):
-                vid = os.path.join(subjects, each_subject)
-            elif each_subject.endswith('cms50_stream_handler.xml'):
-                gt = os.path.join(subjects, each_subject)
-
-        print(vid, gt)
-        hrES = chrom_framework(input_video=vid, dataset='LGI_PPGI')
-        hrGT = chrom_lgi_ppgi(ground_truth_file=gt)
-        print(len(hrGT), len(hrES))
-        print('')
-        chrom_true.append(np.mean(hrGT))
-        chrom_pred.append(np.mean(hrES))
-
-print(chrom_true)
-print(chrom_pred)
-print(mean_absolute_error(chrom_true, chrom_pred))
-print(f"gym: {mean_absolute_error(chrom_true[0:6], chrom_pred[0:6])}")
-print(f"resting: {mean_absolute_error(chrom_true[6:12], chrom_pred[6:12])}")
-print(f"rotation: {mean_absolute_error(chrom_true[12:18], chrom_pred[12:18])}")
-print(f"talk: {mean_absolute_error(chrom_true[18:24], chrom_pred[18:24])}")
+# base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
+# for sub_folders in os.listdir(base_dir):
+#     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#         subjects = os.path.join(base_dir, sub_folders, folders)
+#         for each_subject in os.listdir(subjects):
+#             if each_subject.endswith('.avi'):
+#                 vid = os.path.join(subjects, each_subject)
+#             elif each_subject.endswith('cms50_stream_handler.xml'):
+#                 gt = os.path.join(subjects, each_subject)
+#
+#         print(vid, gt)
+#         hrES = chrom_framework(input_video=vid, dataset='LGI_PPGI')
+#         hrGT = chrom_lgi_ppgi(ground_truth_file=gt)
+#         print(len(hrGT), len(hrES))
+#         print('')
+#         chrom_true.append(np.mean(hrGT))
+#         chrom_pred.append(np.mean(hrES))
+#
+# print(chrom_true)
+# print(chrom_pred)
+# print(mean_absolute_error(chrom_true, chrom_pred))
+# print(f"gym: {mean_absolute_error(chrom_true[0:6], chrom_pred[0:6])}")
+# print(f"resting: {mean_absolute_error(chrom_true[6:12], chrom_pred[6:12])}")
+# print(f"rotation: {mean_absolute_error(chrom_true[12:18], chrom_pred[12:18])}")
+# print(f"talk: {mean_absolute_error(chrom_true[18:24], chrom_pred[18:24])}")
 
 
 # [55.63275434243176, 50.825688073394495, 48.361702127659576, 50.53225806451613, 47.1764705882353, 52.31818181818182, 63.63636363636363, 54.857142857142854, 59.09090909090909, 72.33333333333333, 74.20289855072464, 43.46666666666667, 68.60759493670886, 52.82608695652174, 58.705882352941174, 65.06666666666666, 72.01388888888889, 43.16901408450704, 72.60416666666667, 56.2, 68.6470588235294, 58.71951219512195, 70.625, 70.05952380952381]
@@ -409,79 +414,109 @@ print(f"talk: {mean_absolute_error(chrom_true[18:24], chrom_pred[18:24])}")
 
 
 # Face segmentation
-
+#
 # import cv2
 # import numpy as np
 # import torch
 # from torchvision import transforms
 # from Necessary_Files.face_parsing.model import BiSeNet
+# import os
 #
 # net = BiSeNet(n_classes=19)
 # net.load_state_dict(torch.load('Necessary_Files\\79999_iter.pth', map_location='cpu'))
 # net.eval()
 # to_tensor = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
-#
 # transform = transforms.Compose([transforms.Resize((512, 512)), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 #
-# cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
-# video_sequence = []
 #
-# while True:
-#     ret, frame = cap.read()
 #
-#     face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
 #
-#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-#     width = 1
-#     height = 1
-#     if len(faces) == 0 and face_coordinates_prev is not None:
-#         x, y, w, h = face_coordinates_prev
-#         x1 = int(x + (1 - width) / 2 * w)
-#         y1 = int(y + (1 - height) / 2 * h)
-#         x2 = int(x + (1 + width) / 2 * w)
-#         y2 = int(y + (1 + height) / 2 * h)
-#         roi = frame[y1:y2, x1:x2]
+# # cap = cv2.VideoCapture(r"C:\Users\ilyas\Desktop\VHR\Datasets\Distance vs Light Dataset\test_all_riccardo_distances_L00_NoEx\D01.mp4")
 #
-#     else:
-#         for (x, y, w, h) in faces:
-#             face_coordinates_prev = (x, y, w, h)
+# def asdf(input_video):
+#     raw_sig = []
+#
+#     for frame in extract_frames_yield(input_video):
+#         # ret, frame = cap.read()
+#
+#         face_cascade = cv2.CascadeClassifier("Necessary_Files\\haarcascade_frontalface_default.xml")
+#
+#         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+#         width = 1
+#         height = 1
+#         if len(faces) == 0 and face_coordinates_prev is not None:
+#             x, y, w, h = face_coordinates_prev
 #             x1 = int(x + (1 - width) / 2 * w)
 #             y1 = int(y + (1 - height) / 2 * h)
 #             x2 = int(x + (1 + width) / 2 * w)
 #             y2 = int(y + (1 + height) / 2 * h)
 #             roi = frame[y1:y2, x1:x2]
 #
-#     image = cv2.resize(roi, (512, 512), interpolation=cv2.INTER_LINEAR)
-#     img = to_tensor(image)
-#     img = torch.unsqueeze(img, 0)
-#     out = net(img)[0]
-#     out = out.squeeze().argmax(0).detach().cpu().numpy()
+#         else:
+#             for (x, y, w, h) in faces:
+#                 face_coordinates_prev = (x, y, w, h)
+#                 x1 = int(x + (1 - width) / 2 * w)
+#                 y1 = int(y + (1 - height) / 2 * h)
+#                 x2 = int(x + (1 + width) / 2 * w)
+#                 y2 = int(y + (1 + height) / 2 * h)
+#                 roi = frame[y1:y2, x1:x2]
 #
-#     # Create the masks for classes 0 and 10.
-#     mask_0 = np.where(out == 1, 255, 0).astype('uint8')
-#     mask_10 = np.where(out == 10, 255, 0).astype('uint8')
+#         image = cv2.resize(roi, (512, 512), interpolation=cv2.INTER_LINEAR)
+#         img = to_tensor(image)
+#         img = torch.unsqueeze(img, 0)
+#         out = net(img)[0]
+#         out = out.squeeze().argmax(0).detach().cpu().numpy()
 #
-#     # Combine the masks.
-#     mask_combined = np.where((mask_0 == 255) | (mask_10 == 255), 255, 0).astype('uint8')
+#         # Create the masks for classes 0 and 10.
+#         mask_0 = np.where(out == 1, 255, 0).astype('uint8')
+#         mask_10 = np.where(out == 10, 255, 0).astype('uint8')
 #
-#     # Apply the combined mask to the original frame.
-#     face = cv2.bitwise_and(image, image, mask=mask_combined)
+#         # Combine the masks.
+#         mask_combined = np.where((mask_0 == 255) | (mask_10 == 255), 255, 0).astype('uint8')
 #
-#     # Get the original ROI size.
-#     original_size = roi.shape[:2]
+#         # Apply the combined mask to the original frame.
+#         face = cv2.bitwise_and(image, image, mask=mask_combined)
 #
-#     # Resize the face image back to the original ROI size.
-#     face_resized = cv2.resize(face, (original_size[1], original_size[0]))
+#         # Get the original ROI size.
+#         original_size = roi.shape[:2]
 #
-#     # Display the result.
-#     cv2.imshow('Face', face_resized)
-#     cv2.imshow('frame', roi)
+#         # Resize the face image back to the original ROI size.
+#         face_resized = cv2.resize(face, (original_size[1], original_size[0]))
 #
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
+#         mask_non_black = cv2.inRange(face_resized, np.array([75, 75, 75]), np.array([200, 200, 200]))
+#         b, g, r, a = cv2.mean(face_resized, mask=mask_non_black)
 #
-# cap.release()
-# cv2.destroyAllWindows()
-
-
+#         raw_sig.append([r, g, b])
+#
+#     return(raw_sig)
+#
+#
+# #
+# #
+# #     # Display the result.
+# #     cv2.imshow('Face', face_resized)
+# #     cv2.imshow('frame', roi)
+# #
+# #     if cv2.waitKey(1) & 0xFF == ord('q'):
+# #         break
+# #
+# # cap.release()
+# # cv2.destroyAllWindows()
+#
+# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+# for sub_folders in os.listdir(base_dir):
+#     if sub_folders == 'UBFC2':
+#         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#
+#                     raw_sig = asdf(vid)
+#                     print(enum)
+#                     with open('raw_chrom_sig_face_segmentation.txt', 'a') as f:
+#                         f.write(str(raw_sig))
+#                         f.write('\n')
+#
+#

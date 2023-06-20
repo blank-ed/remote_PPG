@@ -52,6 +52,7 @@ def fir_bp_filter(signal, fps, low=0.5, high=3.7):
     else:
         padlen = None
 
+
     # Filtering using the FIR bandpass filter coefficients.
     # Since its FIR bandpass filter, the denominator coefficient is set as 1
     filtered_signal = filtfilt(filter_coefficients, 1, signal, padlen=padlen, axis=0)
