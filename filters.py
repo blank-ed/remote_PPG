@@ -47,15 +47,15 @@ def fir_bp_filter(signal, fps, low=0.5, high=3.7):
     # Coefficients of FIR bandpass filter
     filter_coefficients = firwin(numtaps=numtaps, cutoff=[low, high], fs=fps, pass_zero=False, window='hamming')
 
-    if len(filter_coefficients) > len(signal):
-        padlen = len(signal)//2
-    else:
-        padlen = None
+    # if len(filter_coefficients) > len(signal):
+    #     padlen = len(signal)//2
+    # else:
+    #     padlen = None
 
 
     # Filtering using the FIR bandpass filter coefficients.
     # Since its FIR bandpass filter, the denominator coefficient is set as 1
-    filtered_signal = filtfilt(filter_coefficients, 1, signal, padlen=padlen, axis=0)
+    filtered_signal = filtfilt(filter_coefficients, 1, signal, padlen=len(signal)-1, axis=0)
 
     return filtered_signal
 

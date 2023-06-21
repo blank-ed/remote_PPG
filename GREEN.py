@@ -289,30 +289,30 @@ green_pred = []
 # [79.95018679950188, 54.38522870331514, 59.44115156646909, 68.53879105188005, 74.87765089722676, 79.82608695652173, 48.99497487437186, 61.99524940617578, 110.53652230122819, 88.9505830094392, 92.10526315789473, 68.51612903225808, 112.16617210682492, 105.35714285714286, 80.9288537549407, 53.17577548005908, 69.68325791855204, 109.71258671952428, 62.3181133968891, 53.62462760675274, 92.19512195121952, 88.85630498533725, 56.63716814159292, 57.14285714285714, 104.5275590551181, 61.59346271705822, 110.20408163265306, 113.12154696132596, 100.60606060606061, 50.31446540880503, 56.80473372781066, 76.36901825357671, 100.93457943925233, 113.4567283641821, 114.987714987715, 60.555826426133606, 119.29824561403508, 53.84615384615384, 54.4390243902439, 84.83063328424153, 87.86982248520711, 99.85272459499262, 98.72673849167484, 69.88551518168244, 77.64005949429847, 111.61417322834646, 94.02310396785535, 111.22095897182402, 60.736196319018404, 61.06194690265487]
 
 
-base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
-for sub_folders in os.listdir(base_dir):
-    for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-        subjects = os.path.join(base_dir, sub_folders, folders)
-        for each_subject in os.listdir(subjects):
-            if each_subject.endswith('.avi'):
-                vid = os.path.join(subjects, each_subject)
-            elif each_subject.endswith('cms50_stream_handler.xml'):
-                gt = os.path.join(subjects, each_subject)
-
-        print(vid, gt)
-        hrES = green_framework(input_video=vid, dataset='LGI_PPGI')
-        hrGT = green_lgi_ppgi(ground_truth_file=gt)
-        print('')
-        green_true.append(np.mean(hrGT))
-        green_pred.append(np.mean(hrES))
-
-print(green_true)
-print(green_pred)
-print(mean_absolute_error(green_true, green_pred))
-print(f"gym: {mean_absolute_error(green_true[0:6], green_pred[0:6])}")
-print(f"resting: {mean_absolute_error(green_true[6:12], green_pred[6:12])}")
-print(f"rotation: {mean_absolute_error(green_true[12:18], green_pred[12:18])}")
-print(f"talk: {mean_absolute_error(green_true[18:24], green_pred[18:24])}")
+# base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
+# for sub_folders in os.listdir(base_dir):
+#     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#         subjects = os.path.join(base_dir, sub_folders, folders)
+#         for each_subject in os.listdir(subjects):
+#             if each_subject.endswith('.avi'):
+#                 vid = os.path.join(subjects, each_subject)
+#             elif each_subject.endswith('cms50_stream_handler.xml'):
+#                 gt = os.path.join(subjects, each_subject)
+#
+#         print(vid, gt)
+#         hrES = green_framework(input_video=vid, dataset='LGI_PPGI')
+#         hrGT = green_lgi_ppgi(ground_truth_file=gt)
+#         print('')
+#         green_true.append(np.mean(hrGT))
+#         green_pred.append(np.mean(hrES))
+#
+# print(green_true)
+# print(green_pred)
+# print(mean_absolute_error(green_true, green_pred))
+# print(f"gym: {mean_absolute_error(green_true[0:6], green_pred[0:6])}")
+# print(f"resting: {mean_absolute_error(green_true[6:12], green_pred[6:12])}")
+# print(f"rotation: {mean_absolute_error(green_true[12:18], green_pred[12:18])}")
+# print(f"talk: {mean_absolute_error(green_true[18:24], green_pred[18:24])}")
 
 # [106.426735218509, 117.06867414349364, 104.9689883795537, 85.73280051841452, 111.99054932073243, 88.63558645845208, 67.14944042132983, 61.20961865435997, 59.51068988318272, 78.68409193330328, 72.53071253071253, 50.935645823824736, 68.45289541918756, 58.34970530451867, 61.8705035971223, 83.24642938109272, 76.90481841917874, 49.76167778836987, 72.29170336445307, 62.460567823343844, 78.66880513231757, 86.17818484596171, 75.22388059701493, 79.64601769911505]
 # [57.698132256436146, 57.146414342629484, 57.012847965738764, 60.94674556213018, 58.375015249481514, 56.227327690447396, 54.73856209150327, 61.78073894609328, 60.03289473684211, 79.03587443946188, 74.81527093596058, 95.56313993174061, 65.98712446351932, 55.147058823529406, 50.4950495049505, 64.37041219649915, 53.57142857142857, 66.884661117717, 50.727739726027394, 55.25013743815283, 51.03668261562999, 56.9331983805668, 60.66176470588235, 71.78095707942774]

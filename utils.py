@@ -292,7 +292,7 @@ def moving_window(sig, fps, window_size, increment):
     for i in range(0, len(sig), int(increment * fps)):
         end = i + int(window_size * fps)
         if end >= len(sig):
-            windowed_sig.append(sig[len(sig) - int(window_size * fps):len(sig)])
+            # windowed_sig.append(sig[len(sig) - int(window_size * fps):len(sig)])
             break
         windowed_sig.append(sig[i:end])
 

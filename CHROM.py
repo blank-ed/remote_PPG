@@ -86,7 +86,7 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
 
         N = len(raw_sig)
         H = np.zeros(N)
-        l = int(fps*1.6)
+        l = int(fps * 1.6)
 
         window = moving_window(raw_sig, fps=fps, window_size=1.6, increment=0.8)
 
@@ -106,19 +106,17 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
 
             SWin = np.multiply(S, windows.hann(len(S)))
 
-            start = enum*(l//2)
-            end = enum*(l//2) + l
+            start = enum * (l // 2)
+            end = enum * (l // 2) + l
 
             if end > len(raw_sig):
-                H[len(raw_sig)-l:len(raw_sig)] = H[len(raw_sig)-l:len(raw_sig)] + SWin
+                H[len(raw_sig) - l:len(raw_sig)] = H[len(raw_sig) - l:len(raw_sig)] + SWin
             else:
                 H[start:end] = H[start:end] + SWin
 
-        H = butterworth_bp_filter(H, fps=fps, low=0.67, high=2)  # MOD ---------------------------------------------
-
         # Compute STFT
-        noverlap = fps*(12-1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
-        nperseg = fps*12  # Length of fourier window (12 seconds as per the paper)
+        noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+        nperseg = fps * 12  # Length of fourier window (12 seconds as per the paper)
 
         frequencies, times, Zxx = stft(H, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
 
@@ -180,34 +178,11 @@ def chrom_ubfc1(ground_truth_file, sampling_frequency=60):
     gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
     gtHR = gtdata.iloc[:, 1]
 
-    N = len(gtTrace)
-    H = np.zeros(N)
-    l = int(sampling_frequency * 1.6)
-
-    window = moving_window(gtTrace, fps=sampling_frequency, window_size=1.6, increment=0.8)
-
-    for enum, each_window in enumerate(window):
-        normalized = np.array(each_window) / np.mean(each_window)
-
-        # bandpass filter Xs and Ys here
-        filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
-
-        SWin = np.multiply(filtered, windows.hann(len(filtered)))
-
-        start = enum * (l // 2)
-        end = enum * (l // 2) + l
-
-        if end > len(gtTrace):
-            H[len(gtTrace) - l:len(gtTrace)] = H[len(gtTrace) - l:len(gtTrace)] + SWin
-        else:
-            H[start:end] = H[start:end] + SWin
-
     # Compute STFT
-    noverlap = sampling_frequency * (
-                12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(H, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    frequencies, times, Zxx = stft(gtTrace, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -262,34 +237,11 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     gtHR = gtdata.iloc[:, 1].tolist()
     gtTrace = gtdata.iloc[:, 2].tolist()
 
-    N = len(gtTrace)
-    H = np.zeros(N)
-    l = int(sampling_frequency * 1.6)
-
-    window = moving_window(gtTrace, fps=sampling_frequency, window_size=1.6, increment=0.8)
-
-    for enum, each_window in enumerate(window):
-        normalized = np.array(each_window) / np.mean(each_window)
-
-        # bandpass filter Xs and Ys here
-        filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
-
-        SWin = np.multiply(filtered, windows.hann(len(filtered)))
-
-        start = enum * (l // 2)
-        end = enum * (l // 2) + l
-
-        if end > len(gtTrace):
-            H[len(gtTrace) - l:len(gtTrace)] = H[len(gtTrace) - l:len(gtTrace)] + SWin
-        else:
-            H[start:end] = H[start:end] + SWin
-
     # Compute STFT
-    noverlap = sampling_frequency * (
-                12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(H, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    frequencies, times, Zxx = stft(gtTrace, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -311,40 +263,40 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
 # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
 # # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 # for sub_folders in os.listdir(base_dir):
-    # if sub_folders == 'UBFC1':
-    #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-    #         subjects = os.path.join(base_dir, sub_folders, folders)
-    #         for each_subject in os.listdir(subjects):
-    #             if each_subject.endswith('.avi'):
-    #                 vid = os.path.join(subjects, each_subject)
-    #             elif each_subject.endswith('.xmp'):
-    #                 gt = os.path.join(subjects, each_subject)
-    #
-    #         print(vid, gt)
-    #         hrES = chrom_framework(input_video=vid, dataset='UBFC1')
-    #         hrGT = chrom_ubfc1(ground_truth_file=gt)
-    #         print(len(hrGT), len(hrES))
-    #         print('')
-    #         chrom_true.append(np.mean(hrGT))
-    #         chrom_pred.append(np.mean(hrES))
-
-    # if sub_folders == 'UBFC2':
-    #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-    #         subjects = os.path.join(base_dir, sub_folders, folders)
-    #         for each_subject in os.listdir(subjects):
-    #             if each_subject.endswith('.avi'):
-    #                 vid = os.path.join(subjects, each_subject)
-    #             elif each_subject.endswith('.txt'):
-    #                 gt = os.path.join(subjects, each_subject)
-    #
-    #         print(vid, gt)
-    #         hrES = chrom_framework(input_video=vid, dataset='UBFC2')
-    #         hrGT = chrom_ubfc2(ground_truth_file=gt)
-    #         print(len(hrGT), len(hrES))
-    #         print('')
-    #         chrom_true.append(np.mean(hrGT))
-    #         chrom_pred.append(np.mean(hrES))
-
+#     # if sub_folders == 'UBFC1':
+#     #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#     #         subjects = os.path.join(base_dir, sub_folders, folders)
+#     #         for each_subject in os.listdir(subjects):
+#     #             if each_subject.endswith('.avi'):
+#     #                 vid = os.path.join(subjects, each_subject)
+#     #             elif each_subject.endswith('.xmp'):
+#     #                 gt = os.path.join(subjects, each_subject)
+#     #
+#     #         print(vid, gt)
+#     #         hrES = chrom_framework(input_video=vid, dataset='UBFC1')
+#     #         hrGT = chrom_ubfc1(ground_truth_file=gt)
+#     #         print(len(hrGT), len(hrES))
+#     #         print('')
+#     #         chrom_true.append(np.mean(hrGT))
+#     #         chrom_pred.append(np.mean(hrES))
+#
+#     if sub_folders == 'UBFC2':
+#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.txt'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#             hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+#             hrGT = chrom_ubfc2(ground_truth_file=gt)
+#             print(len(hrGT), len(hrES))
+#             print('')
+#             chrom_true.append(np.mean(hrGT))
+#             chrom_pred.append(np.mean(hrES))
+#
 # print(chrom_true)
 # print(chrom_pred)
 # print(mean_absolute_error(chrom_true, chrom_pred))
