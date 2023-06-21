@@ -408,8 +408,8 @@ import ast
 
 licvpr_true = []
 licvpr_pred = []
-base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 
 raw_bg_signals_ubfc1 = []
 with open('UBFC1.txt', 'r') as f:
@@ -456,52 +456,52 @@ with open('UBFC2.txt', 'r') as f:
 #     f.write('\n')
 
 
-for sub_folders in os.listdir(base_dir):
-    if sub_folders == 'UBFC1':
-        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                if each_subject.endswith('.avi'):
-                    vid = os.path.join(subjects, each_subject)
-                elif each_subject.endswith('.xmp'):
-                    gt = os.path.join(subjects, each_subject)
-
-            print(vid, gt)
-
-            # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
-            hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc1[enum],
-                                    heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC1')
-            hrGT = licvpr_ubfc1(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=60,
-                                hr_interval=None)
-            # print(len(hrGT), len(hrES))
-            print('')
-            licvpr_true.append(np.mean(hrGT))
-            licvpr_pred.append(np.mean(hrES))
-
-    elif sub_folders == 'UBFC2':
-        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                if each_subject.endswith('.avi'):
-                    vid = os.path.join(subjects, each_subject)
-                elif each_subject.endswith('.txt'):
-                    gt = os.path.join(subjects, each_subject)
-
-            print(vid, gt)
-            # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
-            hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
-                                    heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
-            hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
-                                hr_interval=None)
-            # print(len(hrGT), len(hrES))
-            print('')
-            licvpr_true.append(np.mean(hrGT))
-            licvpr_pred.append(np.mean(hrES))
-
-print(licvpr_true)
-print(licvpr_pred)
-print(mean_absolute_error(licvpr_true, licvpr_pred))
-print(mean_absolute_error(licvpr_true[8:], licvpr_pred[8:]))
+# for sub_folders in os.listdir(base_dir):
+#     # if sub_folders == 'UBFC1':
+#     #     for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+#     #         subjects = os.path.join(base_dir, sub_folders, folders)
+#     #         for each_subject in os.listdir(subjects):
+#     #             if each_subject.endswith('.avi'):
+#     #                 vid = os.path.join(subjects, each_subject)
+#     #             elif each_subject.endswith('.xmp'):
+#     #                 gt = os.path.join(subjects, each_subject)
+#     #
+#     #         print(vid, gt)
+#     #
+#     #         # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
+#     #         hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc1[enum],
+#     #                                 heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC1')
+#     #         hrGT = licvpr_ubfc1(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=60,
+#     #                             hr_interval=None)
+#     #         # print(len(hrGT), len(hrES))
+#     #         print('')
+#     #         licvpr_true.append(np.mean(hrGT))
+#     #         licvpr_pred.append(np.mean(hrES))
+#
+#     if sub_folders == 'UBFC2':
+#         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.txt'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#             # raw_bg_signal = extract_raw_bg_signal(vid, color='g')
+#             hrES = licvpr_framework(input_video=vid, raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
+#                                     heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
+#             hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
+#                                 hr_interval=None)
+#             # print(len(hrGT), len(hrES))
+#             print('')
+#             licvpr_true.append(np.mean(hrGT))
+#             licvpr_pred.append(np.mean(hrES))
+#
+# print(licvpr_true)
+# print(licvpr_pred)
+# print(mean_absolute_error(licvpr_true, licvpr_pred))
+# print(mean_absolute_error(licvpr_true[8:], licvpr_pred[8:]))
 #
 # [75.68359375, 79.1015625, 91.015625, 61.962890625, 69.08203125, 73.046875, 90.4296875, 106.75330528846153, 107.373046875, 97.9248046875, 107.2265625, 98.2177734375, 112.75111607142857, 109.04715401785714, 110.67940848214286, 124.23967633928571, 68.80580357142857, 107.97991071428571, 75.33482142857143, 115.32505580357143, 93.98018973214286, 86.07003348214286, 120.47293526785714, 125.80915178571429, 102.392578125, 65.91796875, 106.28487723214286, 115.224609375, 99.4921875, 115.048828125, 98.56305803571429, 78.59933035714286, 106.03376116071429, 114.50892857142857, 114.697265625, 104.33872767857143, 117.83621651785714, 60.707310267857146, 110.7421875, 84.814453125, 85.88169642857143, 101.45089285714286, 94.04296875, 99.06529017857143, 82.74274553571429, 109.48660714285714, 97.74693080357143, 110.17717633928571, 90.52734375, 88.01618303571429]
 # [70.587158203125, 84.759521484375, 83.38623046875, 82.30329241071429, 74.267578125, 88.5498046875, 96.624755859375, 91.96555397727273, 95.09765625, 97.705078125, 108.193359375, 86.484375, 67.17354910714286, 97.74693080357143, 69.81026785714286, 75.83705357142857, 78.28543526785714, 92.97572544642857, 75.20926339285714, 75.89983258928571, 83.55887276785714, 92.47349330357143, 77.46930803571429, 104.58984375, 110.86774553571429, 87.57672991071429, 78.41099330357143, 89.736328125, 91.93359375, 72.421875, 83.99832589285714, 77.21819196428571, 81.04771205357143, 79.541015625, 76.27650669642857, 85.50502232142857, 94.29408482142857, 113.1591796875, 78.662109375, 105.59430803571429, 103.39704241071429, 72.38420758928571, 83.935546875, 100.38364955357143, 93.310546875, 74.76981026785714, 67.36188616071429, 97.18191964285714, 92.59905133928571, 95.17299107142857]

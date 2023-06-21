@@ -211,7 +211,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             else:
                 b, g, r, a = cv2.mean(roi)
 
-            raw_sig.append(g)
+            raw_sig.append([r, g, b])
 
         else:
             assert False, "Invalid framework. Please choose one of the valid available frameworks " \
