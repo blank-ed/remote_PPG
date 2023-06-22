@@ -50,12 +50,14 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
     mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
                                                    min_detection_confidence=0.5)
 
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'remote_PPG', 'Necessary_Files', 'haarcascade_frontalface_default.xml')
+    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                             'remote_PPG', 'Necessary_Files', 'haarcascade_frontalface_default.xml')
     face_cascade = cv2.CascadeClassifier(file_path)
 
     face_coordinates_prev = None
     mp_coordinates_prev = None
     frame_count = 0
+    usable_roi_count = 0
 
     for frame in extract_frames_yield(input_video):
         frame_count += 1
@@ -77,6 +79,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
         else:
             for (x, y, w, h) in faces:
+                usable_roi_count += 1
                 face_coordinates_prev = (x, y, w, h)
                 x1 = int(x + (1 - width) / 2 * w)
                 y1 = int(y + (1 - height) / 2 * h)
@@ -131,6 +134,8 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             raw_sig.append([r, g, b])
 
         elif framework == 'PhysNet':
+            if usable_roi_count == 129:
+                break
             resized_roi = cv2.resize(roi, (128, 128))
             raw_sig.append(resized_roi)
 

@@ -10,107 +10,8 @@ from ICA_framework.ICA import *
 import os
 import ast
 
+
 def chrom_test(raw_sig):
-    fps = 30
-
-    N = len(raw_sig)
-    H = np.zeros(N)
-    l = int(fps*1.6)
-
-    normalized_signal = (np.array(raw_sig) - np.mean(raw_sig))
-    normalized = [normalized_signal[:, i] for i in range(0, 3)]
-
-    b, a = butter(4, Wn=[0.67, 4.0], fs=fps, btype='bandpass')
-    filtered = np.array([filtfilt(b, a, x) for x in normalized])
-    transposed_list = list(map(list, zip(*filtered)))
-
-    # filtered = butterworth_bp_filter(normalized_signal, fps=fps, low=0.67, high=4.0)
-
-    window = moving_window(transposed_list, fps=fps, window_size=1.6, increment=0.8)
-
-    for enum, each_window in enumerate(window):
-        # normalized = np.array([each_window[:, i] for i in range(0, 3)])
-        # normalized = normalize(signal=each_window, framework='CHROM')  # Normalize each windowed segment
-
-        # Build two orthogonal chrominance signals
-        Xs = 3 * np.array(each_window)[:,0] - 2 * np.array(each_window)[:,1]
-        Ys = 1.5 * np.array(each_window)[:,0] + np.array(each_window)[:,1] - 1.5 * np.array(each_window)[:,2]
-
-        # bandpass filter Xs and Ys here
-        Xf = fir_bp_filter(signal=Xs, fps=fps, low=0.67, high=4.0)
-        Yf = fir_bp_filter(signal=Ys, fps=fps, low=0.67, high=4.0)
-
-        alpha = np.std(Xf) / np.std(Yf)
-        S = Xf - alpha * Yf
-
-        SWin = np.multiply(S, windows.hann(len(S)))
-
-        start = enum*(l//2)
-        end = enum*(l//2) + l
-
-        if end > len(raw_sig):
-            H[len(raw_sig)-l:len(raw_sig)] = H[len(raw_sig)-l:len(raw_sig)] + SWin
-        else:
-            H[start:end] = H[start:end] + SWin
-
-
-    # Compute STFT
-    noverlap = fps*(12-1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
-    nperseg = fps*12  # Length of fourier window (12 seconds as per the paper)
-
-    frequencies, times, Zxx = stft(H, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
-
-    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
-
-    # Detect Peaks for each time slice
-    hr = []
-    for i in range(magnitude_Zxx.shape[1]):
-        peaks, _ = find_peaks(magnitude_Zxx[:, i])
-        if len(peaks) > 0:
-            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
-            hr.append(peak_freq * 60)
-        else:
-            hr.append(None)
-
-    return hr
-
-
-def chrom_test_2(raw_sig):
-
-    normalized_signal = (np.array(raw_sig) - np.mean(raw_sig)) / np.std(raw_sig)
-    normalized = [normalized_signal[:, i] for i in range(0, 3)]
-
-    b, a = butter(4, Wn=[0.67, 4.0], fs=30, btype='bandpass')
-    filtered = np.array([filtfilt(b, a, x) for x in normalized])
-    transposed_list = list(map(list, zip(*filtered)))
-
-    window = moving_window(transposed_list, fps=30, window_size=10, increment=1)
-    hr = []
-    for enum, each_window in enumerate(window):
-
-        # Build two orthogonal chrominance signals
-        Xs = 3 * np.array(each_window)[:,0] - 2 * np.array(each_window)[:,1]
-        Ys = 1.5 * np.array(each_window)[:,0] + np.array(each_window)[:,1] - 1.5 * np.array(each_window)[:,2]
-
-        alpha = np.std(Xs) / np.std(Ys)
-        S = Xs - alpha * Ys
-
-        filtered_S = filtfilt(b, a, S)
-        frequencies, psd = welch(filtered_S, fs=30, nperseg=len(S), nfft=4096)
-
-        first = np.where(frequencies > 0.67)[0]
-        last = np.where(frequencies < 4)[0]
-        first_index = first[0]
-        last_index = last[-1]
-        range_of_interest = range(first_index, last_index + 1, 1)
-        max_idx = np.argmax(psd[range_of_interest])
-        f_max = frequencies[range_of_interest[max_idx]]
-        hr.append(f_max * 60.0)
-
-    return hr
-
-
-def chrom_test_3(raw_sig):
     fps = 30
 
     N = len(raw_sig)
@@ -161,51 +62,6 @@ def chrom_test_3(raw_sig):
         else:
             hr.append(None)
 
-    # fps = 30
-    #
-    # N = len(raw_sig)
-    # H = np.zeros(N)
-    # l = int(fps * 1.6)
-    #
-    # # Coefficients of FIR bandpass filter
-    # filter_coefficients = firwin(numtaps=int(3 * (fps // 0.67)), cutoff=[0.67, 4.0], fs=fps, pass_zero=False, window='hamming')
-    #
-    # for n in range(0, N, 24):
-    #     m = n - l
-    #     if n - l + 1 > 0:
-    #         # Temporal normalization
-    #         Cn = np.array(raw_sig[m:n]) / np.mean(np.array(raw_sig[m:n]))
-    #
-    #         # Projection
-    #         Xs = 3 * Cn[:, 0] - 2 * Cn[:, 1]  # 3Rn-2Gn
-    #         Ys = 1.5 * Cn[:, 0] + Cn[:, 1] - 1.5 * Cn[:, 2]  # 1.5Rn+Gn-1.5Bn
-    #
-    #         Xf = filtfilt(filter_coefficients, 1, Xs, padlen=len(Xs)-1)
-    #         Yf = filtfilt(filter_coefficients, 1, Ys, padlen=len(Ys)-1)
-    #
-    #         alpha = np.std(Xf) / np.std(Yf)
-    #         S = Xf - alpha * Yf
-    #
-    #         SWin = np.multiply(S, windows.hann(len(S)))
-    #
-    #         # Overlap-Adding
-    #         H[m:n] += SWin
-    #
-    # # Compute STFT
-    # noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
-    # nperseg = fps * 12  # Length of fourier window (12 seconds as per the paper)
-    # frequencies, times, Zxx = stft(H, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
-    # magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
-    # # Detect Peaks for each time slice
-    # hr = []
-    # for i in range(magnitude_Zxx.shape[1]):
-    #     peaks, _ = find_peaks(magnitude_Zxx[:, i])
-    #     if len(peaks) > 0:
-    #         peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
-    #         hr.append(peak_freq * 60)
-    #     else:
-    #         hr.append(None)
-
     return hr
 
 
@@ -234,8 +90,6 @@ def pos_test(raw_sig):
 
             # Overlap-Adding
             H[m:n + 1] += (h - np.mean(h))
-
-    # H =
 
     # Compute STFT
     noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -605,48 +459,98 @@ def non_rigid_motion_elimination(signal, segment_length, fps, threshold=0.05):
     return motion_eliminated
 
 
-raw_bg_signals_ubfc2 = []
-with open('UBFC2.txt', 'r') as f:
-    lines = f.readlines()
-    for x in lines:
-        raw_bg_signals_ubfc2.append(ast.literal_eval(x))
-
-
-raw_sig = []
-with open('green_forehead_single_pixel_sig.txt', 'r') as f:
-    read = f.readlines()
-    for x in read:
-        raw_sig.append(ast.literal_eval(x))
-
-true = []
-pred = []
+# raw_bg_signals_ubfc2 = []
+# with open('UBFC2.txt', 'r') as f:
+#     lines = f.readlines()
+#     for x in lines:
+#         raw_bg_signals_ubfc2.append(ast.literal_eval(x))
+#
+#
+# raw_sig = []
+# with open('green_forehead_sig.txt', 'r') as f:
+#     read = f.readlines()
+#     for x in read:
+#         raw_sig.append(ast.literal_eval(x))
+#
+# true = []
+# pred = []
 # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
-for sub_folders in os.listdir(base_dir):
-    if sub_folders == 'UBFC2':
-        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
-            subjects = os.path.join(base_dir, sub_folders, folders)
-            for each_subject in os.listdir(subjects):
-                # if each_subject.endswith('.avi'):
-                #     print(enum)
-                #     raw_sig = extract_raw_sig(os.path.join(subjects, each_subject), framework='GREEN', ROI_type='ROI_II')
-                #     with open('green_forehead_single_pixel_sig.txt', 'a') as f:
-                #         f.write(str(raw_sig))
-                #         f.write('\n')
-                if each_subject.endswith('.txt'):
-                    gt = os.path.join(subjects, each_subject)
-                    print(enum, gt)
-                    # hrGT = licvpr_ubfc2(ground_truth_file=gt)
+# # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# for sub_folders in os.listdir(base_dir):
+#     if sub_folders == 'UBFC2':
+#         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 # if each_subject.endswith('.avi'):
+#                 #     print(enum)
+#                 #     raw_sig = extract_raw_sig(os.path.join(subjects, each_subject), framework='GREEN', ROI_type='ROI_II')
+#                 #     with open('green_forehead_single_pixel_sig.txt', 'a') as f:
+#                 #         f.write(str(raw_sig))
+#                 #         f.write('\n')
+#                 if each_subject.endswith('.txt'):
+#                     gt = os.path.join(subjects, each_subject)
+#                     print(enum, gt)
+#                     hrGT = pos_ubfc2(ground_truth_file=gt)
+#
+#                     raw_signal = raw_sig[enum]
+#                     hrES = pos_test(raw_sig=raw_signal)
+#                     # hrES = licvpr_test(np.array(raw_signal)[:, 1], raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
+#                     #                 heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
+#                     # hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
+#                     #                     hr_interval=None)
+#
+#                     true.append(np.mean(hrGT))
+#                     pred.append(np.mean(hrES))
+#
+# print(true)
+# print(pred)
+# print(mean_absolute_error(true, pred))
 
-                    raw_signal = raw_sig[enum]
-                    hrES = licvpr_test(np.array(raw_signal)[:, 1], raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
-                                    heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
-                    hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
-                                        hr_interval=None)
+import cv2
+import pandas as pd
 
-                    true.append(np.mean(hrGT))
-                    pred.append(np.mean(hrES))
+# vid = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC2\subject01\vid.avi'
+# gt = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC2\subject01\ground_truth.txt'
 
-print(true)
-print(pred)
-print(mean_absolute_error(true, pred))
+# gtdata = pd.read_csv(gt_file, delimiter='\t', header=None)
+# gtTrace = [float(item) for item in gtdata.iloc[0, 0].split(' ') if item != '']
+# gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
+
+vid = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC1\05-gt\vid.avi'
+gt = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC1\05-gt\gtdump.xmp'
+
+gtdata = pd.read_csv(gt, header=None)
+gtTrace = gtdata.iloc[:, 3].tolist()
+gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
+
+# gtTime = gtTime[::2]
+vdTime = []
+cap = cv2.VideoCapture(vid)
+frame_count = 0
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        break
+    frame_time = str(round(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000, 3))
+    vdTime.append(frame_time)
+    cv2.putText(frame, f"from vid: {frame_time}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
+    cv2.putText(frame, f"from gt : {gtTime[frame_count]}", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
+
+    frame_count += 1
+    print(frame_count)
+    # cv2.imshow('frame', frame)
+    # if cv2.waitKey(10) & 0xFF == ord('q'):
+    #     break
+
+cap.release()
+cv2.destroyAllWindows()
+
+print(gtTime)
+print(vdTime)
+print(len(gtTime))
+print(len(vdTime))
+print(gtTime[-1])
+print(vdTime[-1])
+print(gtTime[0:128])
+print(vdTime[0:128])
