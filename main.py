@@ -9,6 +9,7 @@ from ICA_framework.jadeR import jadeR
 from ICA_framework.ICA import *
 import os
 import ast
+from scipy.signal import windows, savgol_filter
 
 
 def chrom_test(raw_sig):
@@ -117,13 +118,6 @@ def pos_test(raw_sig):
 def ica_test(raw_sig):
     fps = 30
 
-    # normalized_signal = (np.array(raw_sig) - np.mean(raw_sig))
-    # normalized = [normalized_signal[:, i] for i in range(0, 3)]
-    #
-    # b, a = butter(4, Wn=[0.67, 4.0], fs=fps, btype='bandpass')
-    # filtered = np.array([filtfilt(b, a, x) for x in normalized])
-    # transposed_list = list(map(list, zip(*filtered)))
-
     # signal windowing with 96.7% overlap
     windowed_sig = moving_window(sig=raw_sig, fps=fps, window_size=30, increment=1)
     hrES = []
@@ -131,8 +125,6 @@ def ica_test(raw_sig):
     prev_hr = None  # Previous HR value
     for sig in windowed_sig:
         normalized = normalize(sig, framework='ICA')  # normalize the windowed signal
-
-        # signal = np.array([np.array(sig)[:, i] for i in range(0, 3)])
 
         # Apply JADE ICA algorithm and select the second component
         W = jadeR(normalized, m=3)
@@ -191,45 +183,137 @@ def ica_test(raw_sig):
 
     return hrES
 
+from scipy.interpolate import CubicSpline
+
+def ica_test_2(raw_sig):
+    fps = 30
+
+    detrended = detrending_filter(np.array(raw_sig), 10)
+    normalized = normalize(detrended, framework='ICA')
+
+    # Apply JADE ICA algorithm and select the second component
+    W = jadeR(normalized, m=3)
+    bvp = np.array(np.dot(W, normalized))
+
+    bvp = bvp[1].flatten()
+    ma_filter = np.convolve(bvp, np.ones(9), mode='valid') / 9
+    bvp = fir_bp_filter(signal=ma_filter, fps=fps, low=0.7, high=4.0)
+
+    windowed_pulse_sig = moving_window(sig=bvp, fps=fps, window_size=11, increment=5)
+    hrES = []
+    prev_hr = None
+    for each_signal_window in windowed_pulse_sig:
+        windowed_signal = each_signal_window * windows.hann(len(each_signal_window))
+        peak_freqs, peak_powers = welch(windowed_signal, fs=fps, nperseg=len(windowed_signal), nfft=4096)
+
+        # For the first previous HR value
+        if prev_hr is None:
+            # Find the highest peak
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+            prev_hr = hr
+        else:
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+
+            # If the difference between the current pulse rate estimation and the last computed value exceeded
+            # the threshold, the algorithm rejected it and searched the operational frequency range for the
+            # frequency corresponding to the next highest power that met this constraint
+            while abs(prev_hr - hr) >= 12:
+                # Remove the previously wrongly determined power and frequency values from the list
+                max_peak_mask = (peak_freqs == max_peak_frequency)
+                peak_freqs = peak_freqs[~max_peak_mask]
+                peak_powers = peak_powers[~max_peak_mask]
+
+                #  If no frequency peaks that met the criteria were located, then
+                # the algorithm retained the current pulse frequency estimation
+                if len(peak_freqs) == 0:
+                    hr = prev_hr
+                    break
+
+                max_peak_index = np.argmax(peak_powers)
+                max_peak_frequency = peak_freqs[max_peak_index]
+                hr = int(max_peak_frequency * 60)
+
+            prev_hr = hr
+        hrES.append(hr)
+
+    window_size = 7
+    rolling_mean_hrES = np.convolve(hrES, np.ones(window_size), mode='valid') / window_size
+    hr = np.mean(rolling_mean_hrES)
+
+    # frequencies, psd = welch(bvp, fs=fps, nperseg=len(bvp), nfft=len(bvp))
+    #
+    # first = np.where(frequencies > 0.7)[0]
+    # last = np.where(frequencies < 4)[0]
+    # first_index = first[0]
+    # last_index = last[-1]
+    # range_of_interest = range(first_index, last_index + 1, 1)
+    # max_idx = np.argmax(psd[range_of_interest])
+    # f_max = frequencies[range_of_interest[max_idx]]
+    # hr = f_max * 60.0
+    #
+    return hr
+
+
 
 def green_test(raw_sig):
     fps = 30
 
-    filtered = butterworth_bp_filter(raw_sig, fps=fps, low=0.8, high=2.0)
-    normalized = (np.array(filtered) - np.mean(filtered)) / np.std(filtered)
-    # filtered = butterworth_bp_filter(normalized, fps=fps, low=0.8, high=2.0)
+    pv_raw = raw_sig
+    pv_ac = ((np.array(pv_raw) - np.mean(pv_raw)) / np.std(pv_raw)).tolist()
+    pv_bp = fir_bp_filter(pv_ac, fps=fps, low=0.8, high=2.0)
 
-    # pv_raw = raw_sig
-    # pv_ac = (np.array(pv_raw) - np.mean(pv_raw)).tolist()
-    # pv_bp = butterworth_bp_filter(pv_raw, fps=fps, low=0.8, high=2.0)
-    #
-    # fft_pv_raw = fft(pv_raw)
-    # fft_pv_ac = fft(pv_ac)
-    # fft_pv_bp = fft(pv_bp)
+    windowed_pulse_sig = moving_window(sig=pv_bp, fps=fps, window_size=11, increment=5)
+    hrES = []
+    prev_hr = None
+    for each_signal_window in windowed_pulse_sig:
+        windowed_signal = each_signal_window * windows.hann(len(each_signal_window))
+        peak_freqs, peak_powers = welch(windowed_signal, fs=fps, nperseg=len(windowed_signal), nfft=4096)
 
-    # Calculate the power spectrum by taking the absolute square of the FFT
-    power_spectrum = np.abs(fft(normalized)) ** 2
+        # For the first previous HR value
+        if prev_hr is None:
+            # Find the highest peak
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
 
-    # Calculate the corresponding frequencies
-    frequencies = fftfreq(len(normalized), d=1 / fps)
+            hr = int(max_peak_frequency * 60)
+            prev_hr = hr
+        else:
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
 
-    # Display only the positive frequencies and corresponding power spectrum
-    positive_frequencies = frequencies[:len(frequencies) // 2]  # Take only the first half
-    positive_spectrum = power_spectrum[:len(power_spectrum) // 2]  # Take only the first half
+            hr = int(max_peak_frequency * 60)
 
-    freq_range = (0.8, 2.0)  # Frequency range
+            # If the difference between the current pulse rate estimation and the last computed value exceeded
+            # the threshold, the algorithm rejected it and searched the operational frequency range for the
+            # frequency corresponding to the next highest power that met this constraint
+            while abs(prev_hr - hr) >= 12:
+                # Remove the previously wrongly determined power and frequency values from the list
+                max_peak_mask = (peak_freqs == max_peak_frequency)
+                peak_freqs = peak_freqs[~max_peak_mask]
+                peak_powers = peak_powers[~max_peak_mask]
 
-    # Find the indices corresponding to the desired frequency range
-    start_idx = np.argmax(positive_frequencies >= freq_range[0])
-    end_idx = np.argmax(positive_frequencies >= freq_range[1])
+                #  If no frequency peaks that met the criteria were located, then
+                # the algorithm retained the current pulse frequency estimation
+                if len(peak_freqs) == 0:
+                    hr = prev_hr
+                    break
 
-    # Extract the frequencies and power spectrum within the desired range
-    frequencies_range = positive_frequencies[start_idx:end_idx]
-    power_spectrum_range = positive_spectrum[start_idx:end_idx]
+                max_peak_index = np.argmax(peak_powers)
+                max_peak_frequency = peak_freqs[max_peak_index]
+                hr = int(max_peak_frequency * 60)
 
-    max_idx = np.argmax(power_spectrum_range)
-    f_max = frequencies_range[max_idx]
-    hr = f_max * 60.0
+            prev_hr = hr
+        hrES.append(hr)
+
+    rolling_mean = np.convolve(hrES, np.ones(7), mode='valid') / 7
+
+    hr = np.mean(rolling_mean)
 
     return hr
 
@@ -270,9 +354,11 @@ def licvpr_test(raw_green_sig, raw_bg_green_signal, heart_rate_calculation_mode=
 
     # Apply the Illumination Rectification filter
     g_ir = rectify_illumination(face_color=np.array(raw_green_sig), bg_color=np.array(raw_bg_green_signal))
+    g_ir = fir_bp_filter(g_ir, fps=fps, low=0.7, high=4)
 
     # Apply the non-rigid motion elimination
     motion_eliminated = non_rigid_motion_elimination(signal=g_ir.tolist(), segment_length=1, fps=fps, threshold=0.05)
+    motion_eliminated = fir_bp_filter(motion_eliminated, fps=fps, low=0.7, high=4)
 
     # Filter the signal using detrending, moving average and bandpass filter
     detrended = detrending_filter(signal=np.array(motion_eliminated), Lambda=300)
@@ -284,7 +370,7 @@ def licvpr_test(raw_green_sig, raw_bg_green_signal, heart_rate_calculation_mode=
         hr = []
 
         for each_signal_window in windowed_pulse_sig:
-            frequencies, psd = welch(each_signal_window, fs=fps, nperseg=len(each_signal_window), nfft=4096)
+            frequencies, psd = welch(each_signal_window, fs=fps, nperseg=len(each_signal_window), nfft=len(each_signal_window))
 
             first = np.where(frequencies > 0.7)[0]
             last = np.where(frequencies < 4)[0]
@@ -466,91 +552,94 @@ def non_rigid_motion_elimination(signal, segment_length, fps, threshold=0.05):
 #         raw_bg_signals_ubfc2.append(ast.literal_eval(x))
 #
 #
-# raw_sig = []
-# with open('green_forehead_sig.txt', 'r') as f:
-#     read = f.readlines()
-#     for x in read:
-#         raw_sig.append(ast.literal_eval(x))
-#
-# true = []
-# pred = []
+raw_sig = []
+with open('green_forehead_sig.txt', 'r') as f:
+    read = f.readlines()
+    for x in read:
+        raw_sig.append(ast.literal_eval(x))
+
+# Licvpr green forehead 8.26
+
+true = []
+pred = []
 # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-# # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
-# for sub_folders in os.listdir(base_dir):
-#     if sub_folders == 'UBFC2':
-#         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
-#             subjects = os.path.join(base_dir, sub_folders, folders)
-#             for each_subject in os.listdir(subjects):
-#                 # if each_subject.endswith('.avi'):
-#                 #     print(enum)
-#                 #     raw_sig = extract_raw_sig(os.path.join(subjects, each_subject), framework='GREEN', ROI_type='ROI_II')
-#                 #     with open('green_forehead_single_pixel_sig.txt', 'a') as f:
-#                 #         f.write(str(raw_sig))
-#                 #         f.write('\n')
-#                 if each_subject.endswith('.txt'):
-#                     gt = os.path.join(subjects, each_subject)
-#                     print(enum, gt)
-#                     hrGT = pos_ubfc2(ground_truth_file=gt)
+base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+for sub_folders in os.listdir(base_dir):
+    if sub_folders == 'UBFC2':
+        for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
+            subjects = os.path.join(base_dir, sub_folders, folders)
+            for each_subject in os.listdir(subjects):
+                # if each_subject.endswith('.avi'):
+                #     print(enum)
+                #     raw_sig = extract_raw_sig(os.path.join(subjects, each_subject), framework='LiCVPR')
+                #     with open('licvpr_roi.txt', 'a') as f:
+                #         f.write(str(raw_sig))
+                #         f.write('\n')
+                if each_subject.endswith('.txt'):
+                    gt = os.path.join(subjects, each_subject)
+                    print(enum, gt)
+                    # hrGT = ica_ubfc2(ground_truth_file=gt)
+
+                    raw_signal = [raw_sig[enum][x][1] for x in range(0, len(raw_sig[enum]))]  # Use this for GREEN and LICVPR
+                    # raw_signal = raw_sig[enum]
+                    # hrES = ica_test_2(raw_sig=raw_signal)
+                    hrES = licvpr_test(np.array(raw_signal), raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
+                                    heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
+                    hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
+                                        hr_interval=None)
+
+                    true.append(np.mean(hrGT))
+                    pred.append(np.mean(hrES))
+
+print(true)
+print(pred)
+print(mean_absolute_error(true, pred))
+
+# import cv2
+# import pandas as pd
 #
-#                     raw_signal = raw_sig[enum]
-#                     hrES = pos_test(raw_sig=raw_signal)
-#                     # hrES = licvpr_test(np.array(raw_signal)[:, 1], raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
-#                     #                 heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
-#                     # hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
-#                     #                     hr_interval=None)
+# # vid = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC2\subject01\vid.avi'
+# # gt = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC2\subject01\ground_truth.txt'
 #
-#                     true.append(np.mean(hrGT))
-#                     pred.append(np.mean(hrES))
+# # gtdata = pd.read_csv(gt_file, delimiter='\t', header=None)
+# # gtTrace = [float(item) for item in gtdata.iloc[0, 0].split(' ') if item != '']
+# # gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
 #
-# print(true)
-# print(pred)
-# print(mean_absolute_error(true, pred))
-
-import cv2
-import pandas as pd
-
-# vid = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC2\subject01\vid.avi'
-# gt = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC2\subject01\ground_truth.txt'
-
-# gtdata = pd.read_csv(gt_file, delimiter='\t', header=None)
-# gtTrace = [float(item) for item in gtdata.iloc[0, 0].split(' ') if item != '']
-# gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
-
-vid = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC1\05-gt\vid.avi'
-gt = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC1\05-gt\gtdump.xmp'
-
-gtdata = pd.read_csv(gt, header=None)
-gtTrace = gtdata.iloc[:, 3].tolist()
-gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
-
-# gtTime = gtTime[::2]
-vdTime = []
-cap = cv2.VideoCapture(vid)
-frame_count = 0
-while True:
-    ret, frame = cap.read()
-
-    if not ret:
-        break
-    frame_time = str(round(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000, 3))
-    vdTime.append(frame_time)
-    cv2.putText(frame, f"from vid: {frame_time}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
-    cv2.putText(frame, f"from gt : {gtTime[frame_count]}", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
-
-    frame_count += 1
-    print(frame_count)
-    # cv2.imshow('frame', frame)
-    # if cv2.waitKey(10) & 0xFF == ord('q'):
-    #     break
-
-cap.release()
-cv2.destroyAllWindows()
-
-print(gtTime)
-print(vdTime)
-print(len(gtTime))
-print(len(vdTime))
-print(gtTime[-1])
-print(vdTime[-1])
-print(gtTime[0:128])
-print(vdTime[0:128])
+# vid = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC1\05-gt\vid.avi'
+# gt = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset\UBFC1\05-gt\gtdump.xmp'
+#
+# gtdata = pd.read_csv(gt, header=None)
+# gtTrace = gtdata.iloc[:, 3].tolist()
+# gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
+#
+# # gtTime = gtTime[::2]
+# vdTime = []
+# cap = cv2.VideoCapture(vid)
+# frame_count = 0
+# while True:
+#     ret, frame = cap.read()
+#
+#     if not ret:
+#         break
+#     frame_time = str(round(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000, 3))
+#     vdTime.append(frame_time)
+#     cv2.putText(frame, f"from vid: {frame_time}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
+#     cv2.putText(frame, f"from gt : {gtTime[frame_count]}", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
+#
+#     frame_count += 1
+#     print(frame_count)
+#     # cv2.imshow('frame', frame)
+#     # if cv2.waitKey(10) & 0xFF == ord('q'):
+#     #     break
+#
+# cap.release()
+# cv2.destroyAllWindows()
+#
+# print(gtTime)
+# print(vdTime)
+# print(len(gtTime))
+# print(len(vdTime))
+# print(gtTime[-1])
+# print(vdTime[-1])
+# print(gtTime[0:128])
+# print(vdTime[0:128])

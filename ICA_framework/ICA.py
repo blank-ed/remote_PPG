@@ -10,7 +10,7 @@ from remote_PPG.utils import *
 from remote_PPG.filters import *
 from remote_PPG.ICA_framework.jadeR import jadeR as jadeR
 from scipy.fft import rfft, rfftfreq
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, welch, windows
 import matplotlib.pyplot as plt
 
 def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
@@ -39,33 +39,23 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
         assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
                      "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
+    detrended = detrending_filter(np.array(raw_sig), 10)
+    normalized = normalize(detrended, framework='ICA')
 
-    # signal windowing with 96.7% overlap
-    windowed_sig = moving_window(sig=raw_sig, fps=fps, window_size=30, increment=1)
+    # Apply JADE ICA algorithm and select the second component
+    W = jadeR(normalized, m=3)
+    bvp = np.array(np.dot(W, normalized))
+
+    bvp = bvp[1].flatten()
+    ma_filter = np.convolve(bvp, np.ones(9), mode='valid') / 9
+    bvp = fir_bp_filter(signal=ma_filter, fps=fps, low=0.7, high=4.0)
+
+    windowed_pulse_sig = moving_window(sig=bvp, fps=fps, window_size=11, increment=5)
     hrES = []
-
-    prev_hr = None  # Previous HR value
-    for sig in windowed_sig:
-        normalized = normalize(sig, framework='ICA')  # normalize the windowed signal
-
-        # Apply JADE ICA algorithm and select the second component
-        W = jadeR(normalized, m=3)
-        bvp = np.array(np.dot(W, normalized))
-        bvp = bvp[comp].flatten()
-        bvp = fir_bp_filter(signal=bvp, fps=fps, low=0.75, high=4.0)
-
-        # Compute the positive frequencies and the corresponding power spectrum
-        freqs = rfftfreq(len(bvp), d=1 / fps)
-        power_spectrum = np.abs(rfft(bvp)) ** 2
-
-        # Find the maximum peak between 0.75 Hz and 4 Hz
-        mask = (freqs >= 0.75) & (freqs <= 4)
-        filtered_power_spectrum = power_spectrum[mask]
-        filtered_freqs = freqs[mask]
-
-        peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
-        peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
-        peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+    prev_hr = None
+    for each_signal_window in windowed_pulse_sig:
+        windowed_signal = each_signal_window * windows.hann(len(each_signal_window))
+        peak_freqs, peak_powers = welch(windowed_signal, fs=fps, nperseg=len(windowed_signal), nfft=4096)
 
         # For the first previous HR value
         if prev_hr is None:
@@ -84,7 +74,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
             # If the difference between the current pulse rate estimation and the last computed value exceeded
             # the threshold, the algorithm rejected it and searched the operational frequency range for the
             # frequency corresponding to the next highest power that met this constraint
-            while abs(prev_hr - hr) >= hr_change_threshold:
+            while abs(prev_hr - hr) >= 12:
                 # Remove the previously wrongly determined power and frequency values from the list
                 max_peak_mask = (peak_freqs == max_peak_frequency)
                 peak_freqs = peak_freqs[~max_peak_mask]
@@ -103,7 +93,76 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
             prev_hr = hr
         hrES.append(hr)
 
-    return hrES
+    window_size = 7
+    rolling_mean_hrES = np.convolve(hrES, np.ones(window_size), mode='valid') / window_size
+    hr = np.mean(rolling_mean_hrES)
+
+    return hr
+
+    # # signal windowing with 96.7% overlap
+    # windowed_sig = moving_window(sig=raw_sig, fps=fps, window_size=30, increment=1)
+    # hrES = []
+    #
+    # prev_hr = None  # Previous HR value
+    # for sig in windowed_sig:
+    #     normalized = normalize(sig, framework='ICA')  # normalize the windowed signal
+    #
+    #     # Apply JADE ICA algorithm and select the second component
+    #     W = jadeR(normalized, m=3)
+    #     bvp = np.array(np.dot(W, normalized))
+    #     bvp = bvp[comp].flatten()
+    #     bvp = fir_bp_filter(signal=bvp, fps=fps, low=0.75, high=4.0)
+    #
+    #     # Compute the positive frequencies and the corresponding power spectrum
+    #     freqs = rfftfreq(len(bvp), d=1 / fps)
+    #     power_spectrum = np.abs(rfft(bvp)) ** 2
+    #
+    #     # Find the maximum peak between 0.75 Hz and 4 Hz
+    #     mask = (freqs >= 0.75) & (freqs <= 4)
+    #     filtered_power_spectrum = power_spectrum[mask]
+    #     filtered_freqs = freqs[mask]
+    #
+    #     peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
+    #     peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
+    #     peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+    #
+    #     # For the first previous HR value
+    #     if prev_hr is None:
+    #         # Find the highest peak
+    #         max_peak_index = np.argmax(peak_powers)
+    #         max_peak_frequency = peak_freqs[max_peak_index]
+    #
+    #         hr = int(max_peak_frequency * 60)
+    #         prev_hr = hr
+    #     else:
+    #         max_peak_index = np.argmax(peak_powers)
+    #         max_peak_frequency = peak_freqs[max_peak_index]
+    #
+    #         hr = int(max_peak_frequency * 60)
+    #
+    #         # If the difference between the current pulse rate estimation and the last computed value exceeded
+    #         # the threshold, the algorithm rejected it and searched the operational frequency range for the
+    #         # frequency corresponding to the next highest power that met this constraint
+    #         while abs(prev_hr - hr) >= hr_change_threshold:
+    #             # Remove the previously wrongly determined power and frequency values from the list
+    #             max_peak_mask = (peak_freqs == max_peak_frequency)
+    #             peak_freqs = peak_freqs[~max_peak_mask]
+    #             peak_powers = peak_powers[~max_peak_mask]
+    #
+    #             #  If no frequency peaks that met the criteria were located, then
+    #             # the algorithm retained the current pulse frequency estimation
+    #             if len(peak_freqs) == 0:
+    #                 hr = prev_hr
+    #                 break
+    #
+    #             max_peak_index = np.argmax(peak_powers)
+    #             max_peak_frequency = peak_freqs[max_peak_index]
+    #             hr = int(max_peak_frequency * 60)
+    #
+    #         prev_hr = hr
+    #     hrES.append(hr)
+    #
+    # return hrES
 
 
 import pandas as pd
@@ -359,8 +418,13 @@ ica_pred = []
 # 12.79793460245643
 # 11.878977160036426
 
-# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
-# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\LGI-PPG Dataset'
+# Improved
+# [110.0, 88.90322580645162, 111.0, 101.27272727272727, 113.47368421052632, 110.78947368421052, 119.15789473684211, 124.89473684210526, 67.94594594594595, 108.15789473684211, 73.78378378378379, 114.52631578947368, 93.84615384615384, 87.07692307692308, 123.02631578947368, 133.26315789473685, 105.36842105263158, 64.0, 127.78378378378379, 114.0, 97.0, 111.55555555555556, 97.94736842105263, 79.36842105263158, 106.78947368421052, 118.75675675675676, 115.89473684210526, 106.41025641025641, 121.33333333333333, 57.81578947368421, 109.8974358974359, 85.26315789473684, 87.15789473684211, 100.0, 98.3076923076923, 98.48648648648648, 84.57894736842105, 111.78947368421052, 95.02702702702703, 114.63157894736842, 91.61111111111111, 87.05263157894737]
+# [102.66666666666667, 95.60714285714286, 109.28571428571429, 99.85714285714285, 100.59523809523809, 110.14285714285715, 114.14285714285715, 118.8095238095238, 68.64285714285714, 108.40476190476191, 81.19047619047619, 115.14285714285715, 93.54761904761905, 84.80952380952381, 117.69047619047619, 100.69047619047619, 102.90476190476191, 63.6, 111.76190476190476, 107.5, 98.85714285714286, 111.71428571428572, 87.97619047619048, 78.38095238095238, 108.57142857142857, 79.92857142857143, 95.78571428571428, 107.26190476190477, 126.40476190476193, 54.57142857142857, 110.66666666666669, 83.16666666666667, 86.66666666666667, 117.5, 97.8809523809524, 97.35714285714285, 87.09523809523809, 111.99999999999999, 94.47619047619048, 111.73809523809526, 91.05714285714286, 86.80952380952381]
+# 5.449090634289519
+
+# base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
+# # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\LGI-PPG Dataset'
 # for sub_folders in os.listdir(base_dir):
 #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
 #         subjects = os.path.join(base_dir, sub_folders, folders)
@@ -373,7 +437,7 @@ ica_pred = []
 #         print(vid, gt)
 #         hrES = ica_framework(input_video=vid, dataset='LGI_PPGI')
 #         hrGT = ica_lgi_ppgi(ground_truth_file=gt)
-#         print(len(hrGT), len(hrES))
+#         # print(len(hrGT), len(hrES))
 #         print('')
 #         ica_true.append(np.mean(hrGT))
 #         ica_pred.append(np.mean(hrES))
@@ -394,3 +458,10 @@ ica_pred = []
 # rotation: 15.819150155424962
 # talk: 7.213709769540288
 
+# [115.41397849462365, 110.53378378378379, 117.04901960784314, 119.22222222222223, 109.69255663430421, 102.72860635696821, 65.3913043478261, 60.92307692307692, 59.26086956521739, 77.18181818181819, 72.36842105263158, 52.45454545454545, 66.91666666666667, 57.473684210526315, 60.833333333333336, 82.95454545454545, 77.07317073170732, 51.0, 73.26153846153846, 62.11363636363637, 80.70370370370371, 87.45098039215686, 74.81632653061224, 78.64150943396227]
+# [90.01810865191148, 108.46683673469387, 89.4169884169884, 79.40700808625337, 92.74876847290639, 85.11538461538461, 109.9591836734694, 68.17142857142855, 59.93877551020409, 80.32653061224491, 73.5142857142857, 46.166666666666664, 70.6734693877551, 59.114285714285714, 75.89285714285714, 81.45238095238095, 78.35714285714285, 54.47619047619048, 84.33766233766234, 67.38775510204081, 70.89795918367346, 79.44642857142857, 80.59183673469387, 70.94642857142856]
+# 11.120418753358862
+# gym: 21.57784535360118
+# resting: 10.512098799823546
+# rotation: 4.453209189693691
+# talk: 7.938521670317034

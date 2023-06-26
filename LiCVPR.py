@@ -41,7 +41,9 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
     if hr_interval is None:
         hr_interval = 10
 
-    raw_green_sig = extract_raw_sig(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
+    # raw_green_sig = extract_raw_sig(input_video, framework='LiCVPR', width=1, height=1)  # Get the raw green signal
+    raw_green_sig = extract_raw_sig(input_video, framework='GREEN', ROI_type='ROI_I')  # MOD ---------------------------
+    raw_green_sig = np.array(raw_green_sig)[:, 1]
 
     if dataset is None:
         fps = get_fps(input_video)  # find the fps of the video
@@ -58,9 +60,11 @@ def licvpr_framework(input_video, raw_bg_green_signal, heart_rate_calculation_mo
 
     # Apply the Illumination Rectification filter
     g_ir = rectify_illumination(face_color=np.array(raw_green_sig), bg_color=np.array(raw_bg_green_signal))
+    g_ir = fir_bp_filter(g_ir, fps=fps, low=0.7, high=4)  # MOD --------------------------------------------------------
 
     # Apply the non-rigid motion elimination
     motion_eliminated = non_rigid_motion_elimination(signal=g_ir.tolist(), segment_length=1, fps=fps, threshold=0.05)
+    motion_eliminated = fir_bp_filter(motion_eliminated, fps=fps, low=0.7, high=4)  # MOD ------------------------------
 
     # Filter the signal using detrending, moving average and bandpass filter
     detrended = detrending_filter(signal=np.array(motion_eliminated), Lambda=300)
@@ -508,6 +512,11 @@ with open('UBFC2.txt', 'r') as f:
 # 18.96827525501842
 # 20.667101801658163
 
+# Improved (using forehead ROI, adding bp filter after g_ir and motion elimination stages)
+# [106.435546875, 98.701171875, 107.77587890625, 98.61328125, 113.232421875, 109.6435546875, 111.4013671875, 125.0244140625, 68.7744140625, 106.4208984375, 75.6591796875, 115.9423828125, 94.1162109375, 85.7666015625, 119.7509765625, 127.6611328125, 100.341796875, 64.5263671875, 108.9111328125, 115.46630859375, 99.64599609375, 115.13671875, 97.265625, 78.515625, 106.93359375, 115.9423828125, 114.84375, 103.7841796875, 116.455078125, 61.0107421875, 110.3759765625, 84.4482421875, 87.01171875, 101.513671875, 93.5302734375, 97.9248046875, 82.6171875, 110.44921875, 96.97265625, 109.7900390625, 90.6005859375, 88.4033203125]
+# [106.5, 99.6, 105.00000000000001, 130.5, 112.0, 108.0, 94.0, 72.0, 67.0, 103.0, 71.0, 99.0, 95.0, 86.0, 122.0, 113.0, 100.0, 66.0, 107.0, 115.5, 102.0, 114.0, 103.0, 79.0, 98.0, 116.0, 115.0, 106.0, 117.0, 66.0, 99.00000000000001, 86.0, 86.0, 94.0, 95.0, 91.0, 83.0, 111.0, 92.0, 112.0, 102.0, 89.0]
+# 5.573309616815475
+
 # raw_bg_signal_lgi_ppgi = []
 # base_dir = r'C:\Users\Admin\Desktop\LGI-PPG Dataset\LGI_PPGI'
 # for sub_folders in os.listdir(base_dir):
@@ -567,3 +576,9 @@ with open('UBFC2.txt', 'r') as f:
 # resting: 25.61689104352679
 # rotation: 12.359967912946425
 # talk: 9.848733218016507
+
+# 9.772221935529775
+# gym: 19.99033675697143
+# resting: 1.3706752232142847
+# rotation: 8.205664777930403
+# talk: 9.522210984002976

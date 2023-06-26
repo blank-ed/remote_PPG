@@ -167,7 +167,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
             b, g, r, a = cv2.mean(frame, mask=mask)
 
-            raw_sig.append(g)
+            raw_sig.append([r, g, b])
 
         elif framework == 'GREEN':
             if ROI_type == 'ROI_I':
