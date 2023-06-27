@@ -22,7 +22,7 @@ def extract_frames_yield(input_video):
     cap.release()
 
 
-def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=1):
+def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=1, pixel_filtering=True):
     """
     :param input_video:
         This takes in an input video file
@@ -36,6 +36,8 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
         Select the width of the detected face bounding box
     :param height:
         Select the height of the detected face bounding box
+    :param pixel_filtering:
+        Apply a simple skin selection process through pixel filtering
     :return:
         if framework == 'PCA':
             Returns the sum of RGB pixel values of video sequence from the ROI
@@ -56,6 +58,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
     face_coordinates_prev = None
     mp_coordinates_prev = None
+    mask = None
     frame_count = 0
     usable_roi_count = 0
 
@@ -89,8 +92,10 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
 
         if framework == 'LiCVPR':
             results = mp_face_mesh.process(roi)
+            region = roi
         else:
             results = mp_face_mesh.process(frame)
+            region = frame
 
         if results.multi_face_landmarks:
             for face_landmarks in results.multi_face_landmarks:
@@ -103,7 +108,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                     selected_landmarks = [0]
 
                 selected_coordinates = [
-                    (int(landmarks[i].x * frame.shape[1]), int(landmarks[i].y * frame.shape[0])) for i in
+                    (int(landmarks[i].x * region.shape[1]), int(landmarks[i].y * region.shape[0])) for i in
                     selected_landmarks]
                 mp_coordinates_prev = selected_coordinates
 
@@ -119,19 +124,8 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             blue_values = np.sum(roi[:, :, 0], axis=(0, 1))
             raw_sig.append([red_values, green_values, blue_values])
 
-        elif framework == 'CHROM':
-            filtered_roi = simple_skin_selection(roi)
-            b, g, r, a = cv2.mean(filtered_roi)
-            raw_sig.append([r, g, b])
-
-        elif framework == 'POS':
-            filtered_roi = simple_skin_selection(roi)
-            b, g, r, a = cv2.mean(filtered_roi)
-            raw_sig.append([r, g, b])
-
-        elif framework == 'ICA':
-            b, g, r, a = cv2.mean(roi)
-            raw_sig.append([r, g, b])
+        elif framework == 'CHROM' or framework == 'POS' or framework == 'ICA':
+            region_of_interest = roi
 
         elif framework == 'PhysNet':
             if usable_roi_count == 129:
@@ -140,7 +134,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             raw_sig.append(resized_roi)
 
         elif framework == 'DeepPhys':
-            # U have two types of ROI. Impleement them. For now just use ROI from VJ
+            # U have two types of ROI. Implement them. For now just use ROI from VJ
             downsampled_image = cv2.resize(roi, (36, 36), interpolation=cv2.INTER_CUBIC)
             raw_sig.append(downsampled_image)
 
@@ -162,12 +156,10 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             contour = np.array(facial_landmark_coordinates, dtype=np.int32)
             contour = contour.reshape((-1, 1, 2))
 
-            mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+            mask = np.zeros(region.shape[:2], dtype=np.uint8)
             cv2.drawContours(mask, [contour], -1, (255, 255, 255), -1)
 
-            b, g, r, a = cv2.mean(frame, mask=mask)
-
-            raw_sig.append([r, g, b])
+            region_of_interest = region
 
         elif framework == 'GREEN':
             if ROI_type == 'ROI_I':
@@ -211,16 +203,26 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
                 assert False, "Invalid ROI type for the 'GREEN' framework. Please choose one of the valid ROI " \
                               "types: 'ROI_I', 'ROI_II', 'ROI_III', or 'ROI_IV' "
 
-            if roi.shape == (3,):
-                b, g, r = roi
-            else:
-                b, g, r, a = cv2.mean(roi)
-
-            raw_sig.append([r, g, b])
+            region_of_interest = roi
 
         else:
             assert False, "Invalid framework. Please choose one of the valid available frameworks " \
                           "types: 'PCA', 'CHROM', 'ICA', 'LiCVPR', or 'GREEN' "
+
+        if ROI_type != 'ROI_II':
+            if pixel_filtering:
+                filtered_roi = simple_skin_selection(region_of_interest, lower_rgb=75, higher_rgb=200)
+            else:
+                filtered_roi = region_of_interest
+
+            if mask is not None:
+                b, g, r, a = cv2.mean(filtered_roi, mask=mask)
+            else:
+                b, g, r, a = cv2.mean(filtered_roi)
+        else:
+            b, g, r = region_of_interest
+
+        raw_sig.append([r, g, b])
 
     return raw_sig
 
@@ -296,7 +298,7 @@ def moving_window(sig, fps, window_size, increment):
     windowed_sig = []
     for i in range(0, len(sig), int(increment * fps)):
         end = i + int(window_size * fps)
-        if end >= len(sig):
+        if end > len(sig):
             # windowed_sig.append(sig[len(sig) - int(window_size * fps):len(sig)])
             break
         windowed_sig.append(sig[i:end])

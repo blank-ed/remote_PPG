@@ -68,29 +68,49 @@ def chrom_test(raw_sig):
 
 def pos_test(raw_sig):
     fps = 30
-
+    print(raw_sig)
     N = len(raw_sig)
     H = np.zeros(N)
     l = int(fps * 1.6)
 
-    for n in range(0, N):
-        m = n - l + 1
-        if n - l + 1 > 0:
-            # Temporal normalization
-            Cn = np.array(raw_sig[m:n + 1]) / np.mean(np.array(raw_sig[m:n + 1]))
+    window = moving_window(raw_sig, fps=fps, window_size=1.6, increment=1 / fps)
 
-            # Projection
-            S1 = Cn[:, 1] - Cn[:, 2]
-            S2 = Cn[:, 1] + Cn[:, 2] - 2 * Cn[:, 0]
+    for enum, each_window in enumerate(window):
+        normalized = normalize(signal=each_window, framework='POS')  # Normalize each windowed segment
 
-            S1_filtered = fir_bp_filter(signal=S1, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
-            S2_filtered = fir_bp_filter(signal=S2, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
+        # Projection
+        S1 = normalized[1] - normalized[2]
+        S2 = normalized[1] + normalized[2] - 2 * normalized[0]
 
-            alpha = np.std(S1_filtered) / np.std(S2_filtered)
-            h = S1_filtered + alpha * S2_filtered
+        S1_filtered = fir_bp_filter(signal=S1, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
+        S2_filtered = fir_bp_filter(signal=S2, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
 
-            # Overlap-Adding
-            H[m:n + 1] += (h - np.mean(h))
+        alpha = np.std(S1_filtered) / np.std(S2_filtered)
+        h = S1_filtered + alpha * S2_filtered
+
+        start = enum
+        end = enum + l
+
+        H[start:end] += (h - np.mean(h))
+
+    # for n in range(0, N):
+    #     m = n - l + 1
+    #     if n - l + 1 > 0:
+    #         # Temporal normalization
+    #         Cn = np.array(raw_sig[m:n + 1]) / np.mean(np.array(raw_sig[m:n + 1]))
+    #
+    #         # Projection
+    #         S1 = Cn[:, 1] - Cn[:, 2]
+    #         S2 = Cn[:, 1] + Cn[:, 2] - 2 * Cn[:, 0]
+    #
+    #         S1_filtered = fir_bp_filter(signal=S1, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
+    #         S2_filtered = fir_bp_filter(signal=S2, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
+    #
+    #         alpha = np.std(S1_filtered) / np.std(S2_filtered)
+    #         h = S1_filtered + alpha * S2_filtered
+    #
+    #         # Overlap-Adding
+    #         H[m:n + 1] += (h - np.mean(h))
 
     # Compute STFT
     noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -562,8 +582,8 @@ with open('green_forehead_sig.txt', 'r') as f:
 
 true = []
 pred = []
-# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 for sub_folders in os.listdir(base_dir):
     if sub_folders == 'UBFC2':
         for enum, folders in enumerate(os.listdir(os.path.join(base_dir, sub_folders))):
@@ -578,15 +598,15 @@ for sub_folders in os.listdir(base_dir):
                 if each_subject.endswith('.txt'):
                     gt = os.path.join(subjects, each_subject)
                     print(enum, gt)
-                    # hrGT = ica_ubfc2(ground_truth_file=gt)
+                    hrGT = pos_ubfc2(ground_truth_file=gt)
 
-                    raw_signal = [raw_sig[enum][x][1] for x in range(0, len(raw_sig[enum]))]  # Use this for GREEN and LICVPR
-                    # raw_signal = raw_sig[enum]
-                    # hrES = ica_test_2(raw_sig=raw_signal)
-                    hrES = licvpr_test(np.array(raw_signal), raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
-                                    heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
-                    hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
-                                        hr_interval=None)
+                    # raw_signal = [raw_sig[enum][x][1] for x in range(0, len(raw_sig[enum]))]  # Use this for GREEN and LICVPR
+                    raw_signal = raw_sig[enum]
+                    hrES = pos_test(raw_sig=raw_signal)
+                    # hrES = licvpr_test(np.array(raw_signal), raw_bg_green_signal=raw_bg_signals_ubfc2[enum],
+                    #                 heart_rate_calculation_mode='continuous', hr_interval=None, dataset='UBFC2')
+                    # hrGT = licvpr_ubfc2(ground_truth_file=gt, heart_rate_calculation_mode='continuous', sampling_frequency=30,
+                    #                     hr_interval=None)
 
                     true.append(np.mean(hrGT))
                     pred.append(np.mean(hrES))

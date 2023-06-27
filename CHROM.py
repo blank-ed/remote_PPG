@@ -73,8 +73,8 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
         hr = f_max * 60.0
 
     elif subject_type == 'motion':
-        # raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)
 
+        # raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)
         raw_sig = extract_raw_sig(input_video, framework='GREEN', ROI_type='ROI_I')  # MOD ----------------------------
 
         if dataset is None:
@@ -113,7 +113,6 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
             end = enum * (l // 2) + l
 
             if end > len(raw_sig):
-                print('ok if statement is simulated')
                 H[len(raw_sig) - l:len(raw_sig)] = H[len(raw_sig) - l:len(raw_sig)] + SWin
             else:
                 H[start:end] = H[start:end] + SWin
@@ -129,6 +128,10 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
         # Detect Peaks for each time slice
         hr = []
         for i in range(magnitude_Zxx.shape[1]):
+            mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+            masked_frequencies = frequencies[mask]
+            masked_magnitude = magnitude_Zxx[mask, i]
+
             peaks, _ = find_peaks(magnitude_Zxx[:, i])
             if len(peaks) > 0:
                 peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]

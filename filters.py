@@ -16,11 +16,11 @@ def normalize(signal, framework=None):
 
     if framework == 'ICA':
         normalized_signal = (signal - mean) / std_dev
-    elif framework == 'CHROM':
+    elif framework == 'CHROM' or framework == 'POS':
         normalized_signal = signal / mean
     else:
         assert False, "Invalid framework for normalizing signal. Please choose one of the valid available frameworks " \
-                      "types: 'CHROM', or 'ICA' "
+                      "types: 'CHROM', 'POS', or 'ICA' "
 
     # Turn normalized signal to [[R] [G] [B]]
     normalized = np.array([normalized_signal[:, i] for i in range(0, 3)])
