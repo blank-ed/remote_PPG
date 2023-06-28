@@ -7,7 +7,7 @@ framework that has been proposed.
 """
 from scipy.signal import welch
 from scipy.signal.windows import windows
-
+from remote_PPG.sig_extraction_utils import *
 from remote_PPG.utils import *
 from remote_PPG.filters import *
 from scipy.fft import fft, fftfreq
@@ -113,7 +113,7 @@ def green_framework(input_video, roi_type='ROI_I', signal='bp', lower_frequency=
                       "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
 
     pv_raw = raw_sig
-    pv_ac = (np.array(pv_raw) - np.mean(pv_raw)).tolist()
+    pv_ac = normalize(pv_raw, normalize_type='zero_mean')
     pv_bp = butterworth_bp_filter(pv_raw, fps=fps, low=lower_frequency, high=higher_frequency)
 
     # Perform the FFT on selected signal

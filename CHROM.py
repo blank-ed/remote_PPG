@@ -6,9 +6,9 @@ framework that has been proposed.
 
 """
 
-from remote_PPG.utils import *
 from scipy.signal import find_peaks, welch, windows, stft
-from remote_PPG.filters import normalize
+from remote_PPG.sig_extraction_utils import *
+from remote_PPG.utils import *
 import numpy as np
 
 
@@ -94,7 +94,7 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
         window = moving_window(raw_sig, fps=fps, window_size=1.6, increment=0.8)
 
         for enum, each_window in enumerate(window):
-            normalized = normalize(signal=each_window, framework='CHROM')  # Normalize each windowed segment
+            normalized = normalize(signal=each_window, normalize_type='mean_normalization')  # Normalize each windowed segment
 
             # Build two orthogonal chrominance signals
             Xs = 3 * normalized[0] - 2 * normalized[1]
@@ -132,9 +132,9 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
             masked_frequencies = frequencies[mask]
             masked_magnitude = magnitude_Zxx[mask, i]
 
-            peaks, _ = find_peaks(magnitude_Zxx[:, i])
+            peaks, _ = find_peaks(masked_magnitude)
             if len(peaks) > 0:
-                peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+                peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
                 hr.append(peak_freq * 60)
             else:
                 hr.append(None)

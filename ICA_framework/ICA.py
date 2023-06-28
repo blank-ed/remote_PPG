@@ -6,6 +6,7 @@ that has been proposed.
 
 """
 
+from remote_PPG.sig_extraction_utils import *
 from remote_PPG.utils import *
 from remote_PPG.filters import *
 from remote_PPG.ICA_framework.jadeR import jadeR as jadeR

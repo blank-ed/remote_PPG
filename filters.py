@@ -1,33 +1,35 @@
+from importlib import import_module
 import numpy as np
 from scipy.signal import firwin, filtfilt, medfilt, butter
 import cv2
 
 
-def normalize(signal, framework=None):
-    """
-    :param signal:
-        Input signal to normalize to have zero-mean and unit variance
-    :return:
-        Normalized signal in [[R] [G] [B]] format
-    """
-    signal = np.array(signal)
-    mean = np.mean(signal, axis=0)
-    std_dev = np.std(signal, axis=0)
-
-    if framework == 'ICA':
-        normalized_signal = (signal - mean) / std_dev
-    elif framework == 'CHROM' or framework == 'POS':
-        normalized_signal = signal / mean
+def apply_filters(signal, combination):
+    if signal.ndim == 3:
+        filtered = [apply_filter_to_signal(each_window, combination) for each_window in signal]
     else:
-        assert False, "Invalid framework for normalizing signal. Please choose one of the valid available frameworks " \
-                      "types: 'CHROM', 'POS', or 'ICA' "
+        filtered = apply_filter_to_signal(signal, combination)
 
-    # Turn normalized signal to [[R] [G] [B]]
-    normalized = np.array([normalized_signal[:, i] for i in range(0, 3)])
-    return normalized
+    return np.array(filtered)
 
 
-def fir_bp_filter(signal, fps, low=0.5, high=3.7):
+def apply_filter_to_signal(window, combination):
+    if combination == ():
+        return np.array(window)
+
+    for each_filter in combination:
+        filter_module = import_module('remote_PPG.filters')
+        filter = getattr(filter_module, each_filter)
+
+        if each_filter == 'butterworth_bp_filter' or each_filter == 'fir_bp_filter':
+            window = filter(window, fps=30)
+        else:
+            window = filter(window)
+
+    return np.array(window)
+
+
+def fir_bp_filter(signal, fps, low=0.7, high=4.0):
     """
     :param signal:
         Takes in the signal to be bandpass filtered
@@ -38,7 +40,7 @@ def fir_bp_filter(signal, fps, low=0.5, high=3.7):
     :param high:
         This is the high frequency level
     :return:
-        Returns the bandpass filtered signal in [[R] [G] [B]] format
+        Returns the bandpass filtered signal
     """
     signal = np.array(signal)
 
@@ -54,7 +56,7 @@ def fir_bp_filter(signal, fps, low=0.5, high=3.7):
     return filtered_signal
 
 
-def butterworth_bp_filter(signal, fps, low=0.5, high=3.7, order=4):
+def butterworth_bp_filter(signal, fps, low=0.8, high=2.0, order=4):
     """
     :param signal:
         Takes in the signal to be bandpass filtered using butterworth
@@ -76,7 +78,7 @@ def butterworth_bp_filter(signal, fps, low=0.5, high=3.7, order=4):
     b, a = butter(order, Wn=[low, high], fs=fps, btype='bandpass')
 
     # Filtering using the butterworth bandpass filter coefficients
-    filtered_signal = filtfilt(b, a, signal)
+    filtered_signal = filtfilt(b, a, signal, axis=0)
 
     return filtered_signal
 
@@ -110,7 +112,7 @@ def detrending_filter(signal, Lambda=300):
     return filtered_signal
 
 
-def moving_average_filter(signal, window_size):
+def moving_average_filter(signal, window_size=3):
     """
     :param signal:
          Takes in the signal to perform moving average filter on
@@ -124,7 +126,7 @@ def moving_average_filter(signal, window_size):
     for i in range(len(signal) - window_size + 1):
         moving_averages.append(sum(signal[i:i+window_size])/window_size)
 
-    return moving_averages
+    return np.array(moving_averages)
 
 
 def simple_skin_selection(frame, lower_rgb=75, higher_rgb=200):
