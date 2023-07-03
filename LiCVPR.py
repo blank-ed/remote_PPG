@@ -417,13 +417,13 @@ licvpr_pred = []
 base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 
 raw_bg_signals_ubfc1 = []
-with open('UBFC1.txt', 'r') as f:
+with open('etc/UBFC1.txt', 'r') as f:
     lines = f.readlines()
     for x in lines:
         raw_bg_signals_ubfc1.append(ast.literal_eval(x))
 
 raw_bg_signals_ubfc2 = []
-with open('UBFC2.txt', 'r') as f:
+with open('etc/UBFC2.txt', 'r') as f:
     lines = f.readlines()
     for x in lines:
         raw_bg_signals_ubfc2.append(ast.literal_eval(x))

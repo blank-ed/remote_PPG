@@ -112,17 +112,12 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
             start = enum * (l // 2)
             end = enum * (l // 2) + l
 
-            if end > len(raw_sig):
-                H[len(raw_sig) - l:len(raw_sig)] = H[len(raw_sig) - l:len(raw_sig)] + SWin
-            else:
-                H[start:end] = H[start:end] + SWin
+            H[start:end] = H[start:end] + SWin
 
         # Compute STFT
         noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
         nperseg = fps * 12  # Length of fourier window (12 seconds as per the paper)
-
         frequencies, times, Zxx = stft(H, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
-
         magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
         # Detect Peaks for each time slice
@@ -212,16 +207,11 @@ def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
     gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
     gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
 
-    normalized = np.array(gtTrace) / np.mean(gtTrace)
-
-    # bandpass filter Xs and Ys here
-    filtered = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
-
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(filtered, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    frequencies, times, Zxx = stft(gtTrace, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -265,10 +255,10 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     return hrGT
 
 
-chrom_true = []
-chrom_pred = []
-# base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
-# # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
+# chrom_true = []
+# # chrom_pred = []
+# # # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+# base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 # for sub_folders in os.listdir(base_dir):
 #     # if sub_folders == 'UBFC1':
 #     #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
@@ -287,22 +277,22 @@ chrom_pred = []
 #     #         chrom_true.append(np.mean(hrGT))
 #     #         chrom_pred.append(np.mean(hrES))
 #
-#     if sub_folders == 'UBFC2':
-#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-#             subjects = os.path.join(base_dir, sub_folders, folders)
-#             for each_subject in os.listdir(subjects):
-#                 if each_subject.endswith('.avi'):
-#                     vid = os.path.join(subjects, each_subject)
-#                 elif each_subject.endswith('.txt'):
-#                     gt = os.path.join(subjects, each_subject)
-#
-#             print(vid, gt)
-#             hrES = chrom_framework(input_video=vid, dataset='UBFC2')
-#             hrGT = chrom_ubfc2(ground_truth_file=gt)
-#             print(len(hrGT), len(hrES))
-#             print('')
-#             chrom_true.append(np.mean(hrGT))
-#             chrom_pred.append(np.mean(hrES))
+    # if sub_folders == 'UBFC2':
+    #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+    #         subjects = os.path.join(base_dir, sub_folders, folders)
+    #         for each_subject in os.listdir(subjects):
+    #             if each_subject.endswith('.avi'):
+    #                 vid = os.path.join(subjects, each_subject)
+    #             elif each_subject.endswith('.txt'):
+    #                 gt = os.path.join(subjects, each_subject)
+    #
+    #         print(vid, gt)
+    #         # hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+    #         hrGT = chrom_ubfc2(ground_truth_file=gt)
+    #         # print(len(hrGT), len(hrES))
+    #         # print('')
+    #         chrom_true.append(np.mean(hrGT))
+    #         # chrom_pred.append(np.mean(hrES))
 #
 # print(chrom_true)
 # print(chrom_pred)

@@ -55,7 +55,7 @@ def moving_window(sig, fps, window_size, increment):
             break
         windowed_sig.append(sig[i:end])
 
-    return windowed_sig
+    return np.array(windowed_sig)
 
 
 def get_filtering_combinations(filtering_methods):
@@ -77,3 +77,21 @@ def get_filtering_combinations(filtering_methods):
                 unique_combinations.append(combo)
 
     return unique_combinations
+
+
+def calculate_mean_rgb(frame):
+    """
+    :param frame:
+        Input frame of video
+    :return:
+        Returns the mean RGB values of non-black pixels
+    """
+    # Find the indices of the non-black pixels
+    non_black_pixels = np.all(frame != [0, 0, 0], axis=-1)
+
+    # Get the non-black pixels
+    non_black_pixels_frame = frame[non_black_pixels]
+
+    # Calculate and return the mean RGB values
+    return np.mean(non_black_pixels_frame, axis=0)
+

@@ -3,6 +3,13 @@ from remote_PPG.filters import *
 from remote_PPG.utils import *
 from scipy.signal import windows
 
+from line_profiler import LineProfiler
+def profile_print(func_to_call, *args, **kwargs):
+    profiler = LineProfiler()
+    profiler.add_function(func_to_call)
+    profiler.runcall(func_to_call, *args, **kwargs)
+    profiler.print_stats()
+
 
 def CHROM(signal, fps, **params):
 
@@ -17,9 +24,10 @@ def CHROM(signal, fps, **params):
         Xs = 3 * normalized[0] - 2 * normalized[1]
         Ys = 1.5 * normalized[0] + normalized[1] - 1.5 * normalized[2]
 
-        # bandpass filter Xs and Ys here
-        Xf = fir_bp_filter(signal=Xs, fps=fps, low=0.67, high=4.0)
-        Yf = fir_bp_filter(signal=Ys, fps=fps, low=0.67, high=4.0)
+        # Stack signals and apply the bandpass filter
+        stacked_signals = np.stack([Xs, Ys], axis=-1)
+        filtered_signals = fir_bp_filter(signal=stacked_signals, fps=30)
+        Xf, Yf = filtered_signals[:, 0], filtered_signals[:, 1]
 
         alpha = np.std(Xf) / np.std(Yf)
         S = Xf - alpha * Yf

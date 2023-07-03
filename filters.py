@@ -140,8 +140,8 @@ def simple_skin_selection(frame, lower_rgb=75, higher_rgb=200):
     :return:
         Returns filtered pixels that lies between given RGB threshold
     """
-    lower_rgb_threshold = np.any(frame < lower_rgb, axis=-1)  # Lower RGB threshold
-    higher_rgb_threshold = np.any(frame > higher_rgb, axis=-1)  # Higher RGB threshold
+    lower_rgb_threshold = np.all(frame <= lower_rgb, axis=-1)  # Lower RGB threshold
+    higher_rgb_threshold = np.all(frame >= higher_rgb, axis=-1)  # Higher RGB threshold
     indices = np.logical_or(lower_rgb_threshold, higher_rgb_threshold) # Combine these indices
 
     img_copy = frame.copy()  # Create a copy of the image to not overwrite the original one

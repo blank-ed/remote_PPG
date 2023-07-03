@@ -4,6 +4,7 @@ from remote_PPG.filters import *
 import mediapipe as mp
 import os
 from mediapipe.tasks.python import vision, BaseOptions
+from remote_PPG.utils import *
 
 
 def extract_frames_yield(input_video):
@@ -159,7 +160,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             mask = np.zeros(region.shape[:2], dtype=np.uint8)
             cv2.drawContours(mask, [contour], -1, (255, 255, 255), -1)
 
-            region_of_interest = region
+            region_of_interest = cv2.bitwise_and(region, region, mask=mask)
 
         elif framework == 'GREEN':
             if ROI_type == 'ROI_I':
@@ -215,10 +216,10 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
             else:
                 filtered_roi = region_of_interest
 
-            if mask is not None:
+            if mask is not None and framework == 'LiCVPR':
                 b, g, r, a = cv2.mean(filtered_roi, mask=mask)
             else:
-                b, g, r, a = cv2.mean(filtered_roi)
+                b, g, r = calculate_mean_rgb(filtered_roi)
         else:
             b, g, r = region_of_interest
 

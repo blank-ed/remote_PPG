@@ -1,32 +1,205 @@
+from importlib import import_module
 import numpy as np
-from scipy.signal import find_peaks, stft
+from scipy.signal import find_peaks, stft, welch
+from scipy.fft import rfft, rfftfreq
+from remote_PPG.utils import *
 
 
-def stft_estimator(signal, fps):
+def get_bpm(signal, fps, type, remove_outlier, bpm_type='continuous'):
+
+    estimator_module = import_module('remote_PPG.hr_estimator')
+    estimator_method = getattr(estimator_module, type)
+
+    if type == 'stft_estimator':
+        hr = estimator_method(signal, fps, remove_outlier)
+    else:
+        hr = estimator_method(signal, fps, remove_outlier, bpm_type)
+
+    return hr
+
+
+def outlier_removal(frequencies, magnitude):
+
+    prev_hr = None
+    hr_estimated = []
+
+    for i in range(min(magnitude.shape)):
+        if magnitude.shape[1] > magnitude.shape[0]:
+            mask = (frequencies[i] >= 0.67) & (frequencies[i] <= 4)
+            masked_frequencies = frequencies[i][mask]
+            masked_magnitude = magnitude[i][mask]
+        else:
+            mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+            masked_frequencies = frequencies[mask]
+            masked_magnitude = magnitude[mask, i]
+
+        peaks, _ = find_peaks(masked_magnitude)
+        peak_freqs = masked_frequencies[peaks]  # corresponding peaks frequencies
+        peak_powers = masked_magnitude[peaks]  # corresponding peaks powers
+
+        # For the first previous HR value
+        if prev_hr is None:
+            # Find the highest peak
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+            prev_hr = hr
+        else:
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+
+            # If the difference between the current pulse rate estimation and the last computed value exceeded
+            # the threshold, the algorithm rejected it and searched the operational frequency range for the
+            # frequency corresponding to the next highest power that met this constraint
+            while abs(prev_hr - hr) >= 12:
+                # Remove the previously wrongly determined power and frequency values from the list
+                max_peak_mask = (peak_freqs == max_peak_frequency)
+                peak_freqs = peak_freqs[~max_peak_mask]
+                peak_powers = peak_powers[~max_peak_mask]
+
+                #  If no frequency peaks that met the criteria were located, then
+                # the algorithm retained the current pulse frequency estimation
+                if len(peak_freqs) == 0:
+                    hr = prev_hr
+                    break
+
+                max_peak_index = np.argmax(peak_powers)
+                max_peak_frequency = peak_freqs[max_peak_index]
+                hr = int(max_peak_frequency * 60)
+
+            prev_hr = hr
+        hr_estimated.append(hr)
+
+    return hr_estimated
+
+
+def stft_estimator(signal, fps, remove_outlier):
 
     # Compute STFT
     noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = fps * 12  # Length of fourier window (12 seconds as per the paper)
 
     frequencies, times, Zxx = stft(signal, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
-
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
-    # Detect Peaks for each time slice
-    hr = []
-    for i in range(magnitude_Zxx.shape[1]):
-        mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
-        masked_frequencies = frequencies[mask]
-        masked_magnitude = magnitude_Zxx[mask, i]
+    if remove_outlier:
+        hr = outlier_removal(frequencies, magnitude_Zxx)
+    else:
+        # Detect Peaks for each time slice
+        hr = []
+        for i in range(magnitude_Zxx.shape[1]):
+            mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+            masked_frequencies = frequencies[mask]
+            masked_magnitude = magnitude_Zxx[mask, i]
 
-        peaks, _ = find_peaks(masked_magnitude)
-        if len(peaks) > 0:
-            peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
-            hr.append(peak_freq * 60)
-        else:
-            hr.append(None)
+            peaks, _ = find_peaks(masked_magnitude)
+            if len(peaks) > 0:
+                peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
+                hr.append(peak_freq * 60)
+            else:
+                hr.append(None)
 
     return hr
 
 
-def fft_estimator(signal, fps):
+def fft_estimator(signal, fps, remove_outlier, bpm_type):
+
+    if bpm_type == 'average':
+        # Compute the positive frequencies and the corresponding power spectrum
+        freqs = rfftfreq(len(signal), d=1 / fps)
+        power_spectrum = np.abs(rfft(signal)) ** 2
+
+        # Find the maximum peak between 0.75 Hz and 4 Hz
+        mask = (freqs >= 0.75) & (freqs <= 4)
+        filtered_power_spectrum = power_spectrum[mask]
+        filtered_freqs = freqs[mask]
+
+        peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
+        peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
+        peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+
+        max_peak_index = np.argmax(peak_powers)
+        max_peak_frequency = peak_freqs[max_peak_index]
+        hr = int(max_peak_frequency * 60)
+
+    elif bpm_type == 'continuous':
+        windowed_sig = moving_window(sig=signal, fps=fps, window_size=12, increment=11)
+
+        frequencies = []
+        magnitude = []
+        hr = []
+
+        for each_sig in windowed_sig:
+            # Compute the positive frequencies and the corresponding power spectrum
+            freqs = rfftfreq(len(each_sig), d=1 / fps)
+            power_spectrum = np.abs(rfft(each_sig)) ** 2
+
+            frequencies.append(freqs)
+            magnitude.append(power_spectrum)
+
+        if remove_outlier:
+            hr = outlier_removal(np.array(frequencies), np.array(magnitude))
+        else:
+            for freqs, power_spectrum in zip(frequencies, magnitude):
+                # Find the maximum peak between 0.75 Hz and 4 Hz
+                mask = (freqs >= 0.75) & (freqs <= 4)
+                filtered_power_spectrum = power_spectrum[mask]
+                filtered_freqs = freqs[mask]
+
+                peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
+                peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
+                peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+
+                max_peak_index = np.argmax(peak_powers)
+                max_peak_frequency = peak_freqs[max_peak_index]
+                hr.append(max_peak_frequency * 60)
+
+    return hr
+
+
+def welch_estimator(signal, fps, remove_outlier, bpm_type):
+
+    if bpm_type == 'average':
+        frequencies, psd = welch(signal, fs=fps, nperseg=len(signal), nfft=8192)
+
+        first = np.where(frequencies > 0.7)[0]
+        last = np.where(frequencies < 4)[0]
+        first_index = first[0]
+        last_index = last[-1]
+        range_of_interest = range(first_index, last_index + 1, 1)
+        max_idx = np.argmax(psd[range_of_interest])
+        f_max = frequencies[range_of_interest[max_idx]]
+        hr = f_max * 60.0
+
+    elif bpm_type == 'continuous':
+        windowed_sig = moving_window(sig=signal, fps=fps, window_size=12, increment=11)
+
+        frequencies = []
+        magnitude = []
+        hr = []
+
+        for each_sig in windowed_sig:
+            freqs, psd = welch(each_sig, fs=fps, nperseg=len(each_sig), nfft=8192)
+
+            frequencies.append(freqs)
+            magnitude.append(psd)
+
+        if remove_outlier:
+            hr = outlier_removal(np.array(frequencies), np.array(magnitude))
+        else:
+            for freqs, power_spectrum in zip(frequencies, magnitude):
+
+                first = np.where(freqs > 0.7)[0]
+                last = np.where(freqs < 4)[0]
+                first_index = first[0]
+                last_index = last[-1]
+                range_of_interest = range(first_index, last_index + 1, 1)
+                max_idx = np.argmax(power_spectrum[range_of_interest])
+                f_max = freqs[range_of_interest[max_idx]]
+                hr.append(f_max * 60.0)
+
+    return hr
+
