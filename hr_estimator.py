@@ -34,6 +34,12 @@ def outlier_removal(frequencies, magnitude):
             masked_magnitude = magnitude[mask, i]
 
         peaks, _ = find_peaks(masked_magnitude)
+
+        if len(peaks) == 0:
+            if prev_hr is not None:
+                hr_estimated.append(prev_hr)
+            continue
+
         peak_freqs = masked_frequencies[peaks]  # corresponding peaks frequencies
         peak_powers = masked_magnitude[peaks]  # corresponding peaks powers
 
