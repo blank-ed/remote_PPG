@@ -144,12 +144,7 @@ for enum_sig_params, each_sig_params in enumerate(sig_parameters):
                         ground_truth_hr = [108.01886792452831, 94.2741935483871, 105.1063829787234, 99.05660377358491, 112.02898550724638, 108.40579710144928, 110.3623188405797, 123.76811594202898, 68.75, 103.26086956521739, 69.92647058823529, 115.8695652173913, 93.07142857142857, 86.78571428571429, 120.72463768115942, 125.8695652173913, 102.68115942028986, 65.97014925373135, 106.54411764705883, 115.0, 98.33333333333333, 109.38775510204081, 98.04347826086956, 78.76811594202898, 105.43478260869566, 116.83823529411765, 116.44927536231884, 103.64285714285714, 119.28571428571429, 57.10144927536232, 109.14285714285714, 84.92753623188406, 86.15942028985508, 101.01449275362319, 95.14285714285714, 99.48529411764706, 82.89855072463769, 110.14492753623189, 97.20588235294117, 105.94202898550725, 90.8955223880597, 87.82608695652173]
                         estimated_hr = []
                         base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2'
-                        if i == 4823:
-                            print([i, each_sig_params, px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier])
                         if i > 4823:
-
-                            print([i, each_sig_params, px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier])
-                            print(raw_sig[enum_sig_params][enum_px_filter])
                             for enum_subject, folder_name in enumerate(os.listdir(base_dir)):
                                 subjects = os.path.join(base_dir, folder_name)
                                 for subject_name in os.listdir(subjects):
