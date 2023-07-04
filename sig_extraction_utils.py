@@ -23,7 +23,7 @@ def extract_frames_yield(input_video):
     cap.release()
 
 
-def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=1, pixel_filtering=True):
+def extract_raw_sig(input_video, framework=None, ROI_type='None', width=1, height=1, pixel_filtering=True):
     """
     :param input_video:
         This takes in an input video file
@@ -67,7 +67,7 @@ def extract_raw_sig(input_video, framework=None, ROI_type=None, width=1, height=
         frame_count += 1
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5, minSize=(30, 30))
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
 
         # Look through the first 200 frames until face is detected
         if len(faces) == 0 and frame_count <= 200:

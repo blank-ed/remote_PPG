@@ -2,6 +2,8 @@ import numpy as np
 from remote_PPG.filters import *
 from remote_PPG.utils import *
 from scipy.signal import windows
+from ICA_framework.jadeR import jadeR
+
 
 from line_profiler import LineProfiler
 def profile_print(func_to_call, *args, **kwargs):
@@ -26,7 +28,7 @@ def CHROM(signal, fps, **params):
 
         # Stack signals and apply the bandpass filter
         stacked_signals = np.stack([Xs, Ys], axis=-1)
-        filtered_signals = fir_bp_filter(signal=stacked_signals, fps=30)
+        filtered_signals = fir_bp_filter(signal=stacked_signals, fps=30, low=0.67, high=4.0)
         Xf, Yf = filtered_signals[:, 0], filtered_signals[:, 1]
 
         alpha = np.std(Xf) / np.std(Yf)
@@ -64,3 +66,37 @@ def POS(signal, fps, **params):
         H[start:end] += (h - np.mean(h))
 
     return H
+
+
+def ICA(signal, **params):
+
+    comp = 1  # Change this to take in the comp from params
+
+    bvp = []
+    for each_window in signal:
+        normalized = normalize(each_window, normalize_type='zero_mean_unit_variance')
+
+        # Apply JADE ICA algorithm and select the second component
+        W = jadeR(normalized, m=3)
+        bvp.append(np.array(np.dot(W, normalized))[comp].flatten())
+
+    return bvp
+
+
+def GREEN(signal):
+
+    bvp = []
+    for each_window in signal:
+        bvp.append(each_window[:, 1])
+
+    return bvp
+
+
+def LiCVPR(signal, bg_signal):
+
+    bvp = []
+    for enum, each_window in enumerate(signal):
+        continue
+
+    return bvp
+

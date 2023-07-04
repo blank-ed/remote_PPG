@@ -41,7 +41,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
                      "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
     detrended = detrending_filter(np.array(raw_sig), 10)
-    normalized = normalize(detrended, framework='ICA')
+    normalized = normalize(detrended, normalize_type='zero_mean_unit_variance')
 
     # Apply JADE ICA algorithm and select the second component
     W = jadeR(normalized, m=3)
@@ -106,7 +106,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
     #
     # prev_hr = None  # Previous HR value
     # for sig in windowed_sig:
-    #     normalized = normalize(sig, framework='ICA')  # normalize the windowed signal
+    #     normalized = normalize(sig, normalize_type='zero_mean_unit_variance')  # normalize the windowed signal
     #
     #     # Apply JADE ICA algorithm and select the second component
     #     W = jadeR(normalized, m=3)

@@ -180,11 +180,15 @@ def chrom_ubfc1(ground_truth_file, sampling_frequency=60):
     gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
     gtHR = gtdata.iloc[:, 1]
 
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(gtTrace, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    # Perform STFT
+    frequencies, times, Zxx = stft(filtered_signals, sampling_frequency, nperseg=nperseg, noverlap=noverlap)
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -207,11 +211,15 @@ def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
     gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
     gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
 
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(gtTrace, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    # Perform STFT
+    frequencies, times, Zxx = stft(filtered_signals, sampling_frequency, nperseg=nperseg, noverlap=noverlap)
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -234,11 +242,15 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     gtHR = gtdata.iloc[:, 1].tolist()
     gtTrace = gtdata.iloc[:, 2].tolist()
 
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
 
-    frequencies, times, Zxx = stft(gtTrace, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    # Perform STFT
+    frequencies, times, Zxx = stft(filtered_signals, sampling_frequency, nperseg=nperseg, noverlap=noverlap)
 
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
@@ -277,27 +289,27 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
 #     #         chrom_true.append(np.mean(hrGT))
 #     #         chrom_pred.append(np.mean(hrES))
 #
-    # if sub_folders == 'UBFC2':
-    #     for folders in os.listdir(os.path.join(base_dir, sub_folders)):
-    #         subjects = os.path.join(base_dir, sub_folders, folders)
-    #         for each_subject in os.listdir(subjects):
-    #             if each_subject.endswith('.avi'):
-    #                 vid = os.path.join(subjects, each_subject)
-    #             elif each_subject.endswith('.txt'):
-    #                 gt = os.path.join(subjects, each_subject)
-    #
-    #         print(vid, gt)
-    #         # hrES = chrom_framework(input_video=vid, dataset='UBFC2')
-    #         hrGT = chrom_ubfc2(ground_truth_file=gt)
-    #         # print(len(hrGT), len(hrES))
-    #         # print('')
-    #         chrom_true.append(np.mean(hrGT))
-    #         # chrom_pred.append(np.mean(hrES))
+#     if sub_folders == 'UBFC2':
+#         for folders in os.listdir(os.path.join(base_dir, sub_folders)):
+#             subjects = os.path.join(base_dir, sub_folders, folders)
+#             for each_subject in os.listdir(subjects):
+#                 if each_subject.endswith('.avi'):
+#                     vid = os.path.join(subjects, each_subject)
+#                 elif each_subject.endswith('.txt'):
+#                     gt = os.path.join(subjects, each_subject)
+#
+#             print(vid, gt)
+#             # hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+#             hrGT = chrom_ubfc2(ground_truth_file=gt)
+#             # print(len(hrGT), len(hrES))
+#             # print('')
+#             chrom_true.append(np.mean(hrGT))
+#             # chrom_pred.append(np.mean(hrES))
 #
 # print(chrom_true)
-# print(chrom_pred)
-# print(mean_absolute_error(chrom_true, chrom_pred))
-# print(mean_absolute_error(chrom_true[8:], chrom_pred[8:]))
+# # print(chrom_pred)
+# # print(mean_absolute_error(chrom_true, chrom_pred))
+# # print(mean_absolute_error(chrom_true[8:], chrom_pred[8:]))
 
 # Without Mod for UBFC2
 # [108.01886792452831, 94.2741935483871, 109.04255319148936, 99.05660377358491, 112.02898550724638, 108.40579710144928, 110.28985507246377, 123.76811594202898, 68.82352941176471, 107.17391304347827, 76.3970588235294, 115.8695652173913, 93.07142857142857, 86.85714285714286, 120.5072463768116, 125.8695652173913, 102.68115942028986, 65.97014925373135, 106.54411764705883, 114.9, 98.23529411764706, 109.38775510204081, 98.04347826086956, 78.76811594202898, 105.43478260869566, 116.76470588235294, 116.44927536231884, 103.57142857142857, 119.28571428571429, 59.492753623188406, 109.14285714285714, 84.92753623188406, 86.15942028985508, 101.01449275362319, 95.07142857142857, 99.41176470588235, 82.82608695652173, 110.14492753623189, 97.13235294117646, 110.5072463768116, 90.8955223880597, 87.82608695652173]

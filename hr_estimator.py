@@ -106,7 +106,10 @@ def stft_estimator(signal, fps, remove_outlier):
                 peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
                 hr.append(peak_freq * 60)
             else:
-                hr.append(None)
+                if hr:
+                    hr.append(hr[-1])  # append the last recorded hr value
+                else:
+                    continue  # skip the iteration if there are no peaks and no previous hr values
 
     return hr
 

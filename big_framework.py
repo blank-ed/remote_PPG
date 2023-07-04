@@ -1,24 +1,33 @@
-# from importlib import import_module
-# from remote_PPG.sig_extraction_utils import *
-# from remote_PPG.utils import *
-# from remote_PPG.filters import *
+from importlib import import_module
+from remote_PPG.sig_extraction_utils import *
+from remote_PPG.utils import *
+from remote_PPG.filters import *
 from remote_PPG.methods import *
 from remote_PPG.hr_estimator import *
 import csv
 import ast
 import os
 from sklearn.metrics import mean_absolute_error
+from CHROM import chrom_ubfc2
 import time
 from line_profiler import LineProfiler
 
 
 def big_framework(input_video, sig_extraction_params=None, px_filter=True, windowing_params=None, pre_filtering=None,
-                  method='CHROM', post_filtering=None, hr_estimation='stft_estimator', remove_outlier=False):
+                  method='CHROM', post_filtering=None, hr_estimation='stft_estimator', remove_outlier=False,
+                  dataset=None):
 
-    # raw_sig = extract_raw_sig(input_video, **sig_extraction_params, pixel_filtering=px_filter)
-    # fps = get_fps(input_video)
-    raw_sig = input_video
-    fps = 30
+    if dataset is None:
+        fps = get_fps(input_video)  # find the fps of the video
+    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+        fps = 30
+    elif dataset == 'LGI_PPGI':
+        fps = 25
+    else:
+        assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+                      "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
+
+    raw_sig = extract_raw_sig(input_video, **sig_extraction_params, pixel_filtering=px_filter)
 
     sig_windowing = moving_window(raw_sig, fps=fps, **windowing_params)
 
@@ -118,22 +127,13 @@ from tqdm import tqdm
 #         f.write(f"Error Details: Sub_folder: {str(sub_folder_name)}, Folder: {str(folder_name)}, Subject: {str(subject_name)}, Sig_Parameters: {str(each_sig_name)}, Pixel_Filter: {str(px_filtering_name)}\n")
 #     os.system('shutdown /s /t 20')
 
-raw_sig = []
-with open('UBFC2_raw_sigs.txt', 'r') as f:
-    read = f.readlines()
-    for x in read:
-        sigs = ast.literal_eval(x)
-        raw_sig.append(sigs)
+# raw_sig = []
+# with open('UBFC2_raw_sigs.txt', 'r') as f:
+#     read = f.readlines()
+#     for x in read:
+#         sigs = ast.literal_eval(x)
+#         raw_sig.append(sigs)
 
-def profile_print(func_to_call, *args, **kwargs):
-    profiler = LineProfiler()
-    profiler.add_function(func_to_call)
-    profiler.runcall(func_to_call, *args, **kwargs)
-    profiler.print_stats()
-
-
-
-start_time = time.time()
 i = 0
 for enum_sig_params, each_sig_params in enumerate(sig_parameters):
     for enum_px_filter, px_filtering in enumerate(px_filter):
@@ -141,57 +141,38 @@ for enum_sig_params, each_sig_params in enumerate(sig_parameters):
             for post_filtering_combo in filtering_combinations:
                 for hr_estimator in hr_estimation:
                     for removing_outlier in outlier_removal:
-                        ground_truth_hr = [108.01886792452831, 94.2741935483871, 105.1063829787234, 99.05660377358491, 112.02898550724638, 108.40579710144928, 110.3623188405797, 123.76811594202898, 68.75, 103.26086956521739, 69.92647058823529, 115.8695652173913, 93.07142857142857, 86.78571428571429, 120.72463768115942, 125.8695652173913, 102.68115942028986, 65.97014925373135, 106.54411764705883, 115.0, 98.33333333333333, 109.38775510204081, 98.04347826086956, 78.76811594202898, 105.43478260869566, 116.83823529411765, 116.44927536231884, 103.64285714285714, 119.28571428571429, 57.10144927536232, 109.14285714285714, 84.92753623188406, 86.15942028985508, 101.01449275362319, 95.14285714285714, 99.48529411764706, 82.89855072463769, 110.14492753623189, 97.20588235294117, 105.94202898550725, 90.8955223880597, 87.82608695652173]
+                        ground_truth_hr = []
                         estimated_hr = []
                         base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2'
-                        if i > 4823:
-                            for enum_subject, folder_name in enumerate(os.listdir(base_dir)):
-                                subjects = os.path.join(base_dir, folder_name)
-                                for subject_name in os.listdir(subjects):
-                                    if subject_name.endswith('.avi'):
-                                        vid = os.path.join(subjects, subject_name)
-                                    elif subject_name.endswith('.txt'):
-                                        gt = os.path.join(subjects, subject_name)
-                                hrES = big_framework(
-                                    # input_video=r'C:\Users\Admin\Desktop\Riccardo New Dataset\test_L00_no_ex_riccardo_all_distances\D01.mp4',
-                                    input_video=raw_sig[enum_subject][enum_sig_params][enum_px_filter],
-                                    sig_extraction_params=each_sig_params,
-                                    px_filter=px_filtering,
-                                    windowing_params=window_params,
-                                    pre_filtering=pre_filtering_combo,
-                                    method='CHROM',
-                                    post_filtering=post_filtering_combo,
-                                    hr_estimation=hr_estimator,
-                                    remove_outlier=removing_outlier)
-                                estimated_hr.append(np.mean(hrES))
+                        for enum_subject, folder_name in enumerate(os.listdir(base_dir)):
+                            subjects = os.path.join(base_dir, folder_name)
+                            vid, gt = None, None
+                            for subject_name in os.listdir(subjects):
+                                if subject_name.endswith('.avi'):
+                                    vid = os.path.join(subjects, subject_name)
+                                elif subject_name.endswith('.txt'):
+                                    gt = os.path.join(subjects, subject_name)
+                            hrES = big_framework(input_video=vid,
+                                                 sig_extraction_params=each_sig_params,
+                                                 px_filter=px_filtering,
+                                                 windowing_params=window_params,
+                                                 pre_filtering=pre_filtering_combo,
+                                                 method='CHROM',
+                                                 post_filtering=post_filtering_combo,
+                                                 hr_estimation=hr_estimator,
+                                                 remove_outlier=removing_outlier)
+                            estimated_hr.append(np.mean(hrES))
+                            hrGT = chrom_ubfc2(ground_truth_file=gt)
+                            ground_truth_hr.append(np.mean(hrGT))
 
-
-                            MAE = mean_absolute_error(ground_truth_hr, estimated_hr)
+                        MAE = mean_absolute_error(ground_truth_hr, estimated_hr)
                         i += 1
 
-                        elapsed_time = time.time() - start_time  # Compute elapsed time
-                        avg_time_per_iteration = elapsed_time / i  # Compute average time per iteration
-                        remaining_iterations = 13824 - i  # Compute remaining iterations
-                        est_remaining_time = remaining_iterations * avg_time_per_iteration  # Estimated remaining time
-                        if i > 4824:
-                            combo = [i, each_sig_params['framework'], px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier, MAE]
-                            with open('UBFC2_permutations.csv', 'a', newline='') as f:
-                                writer = csv.writer(f)
-                                writer.writerow(combo)
-                        print(f"{(i / 13824) * 100}% or {i}/13824 or {13824 - i} left or {est_remaining_time/60} minutes left")
-
-                            # print(each_sig_params, px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier, enum_subject)
-                            # print(enum_sig_params, enum_px_filter, enum_subject)
-                            # print(raw_sig[enum_subject][enum_sig_params][enum_px_filter])
-                            # print(len(raw_sig[enum_subject][enum_sig_params][enum_px_filter]))
-                            # print('')
-                            # time.sleep(0.1)
-                        # combo = [i, each_sig_params['framework'], px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier, np.mean(output)]
-                        # with open('test.csv', 'a', newline='') as f:
-                        #     writer = csv.writer(f)
-                        #     writer.writerow(combo)
-                        # print(f"{(i/13824) * 100}% or {i}/13824 or {13824-i} left")
-
+                        combo = [i, each_sig_params, px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier, MAE]
+                        with open('UBFC2_CHROM_permutations.csv', 'a', newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow(combo)
+                        print(f"{(i / 13824) * 100}% or {i}/13824 or {13824 - i} left")
 
 
 # -------------------- This is for testing -------------------- #
