@@ -27,8 +27,8 @@ def big_framework(input_video, sig_extraction_params=None, px_filter=True, windo
         assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
                       "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
-    raw_sig = extract_raw_sig(input_video, **sig_extraction_params, pixel_filtering=px_filter)
-
+    # raw_sig = extract_raw_sig(input_video, **sig_extraction_params, pixel_filtering=px_filter)
+    raw_sig = input_video
     sig_windowing = moving_window(raw_sig, fps=fps, **windowing_params)
 
     pre_filtered_sig = apply_filters(sig_windowing, pre_filtering)
@@ -117,7 +117,6 @@ from tqdm import tqdm
 #                     f.write(str(for_each_framework) + "\n")
 #
 #     print("Simulation completed successfully.")
-#     os.system('shutdown /s /t 20')
 #
 # except Exception as e:
 #     print(f"An error occurred: {str(e)}")
@@ -125,14 +124,13 @@ from tqdm import tqdm
 #     with open('UBFC2_raw_sigs.txt', 'a') as f:
 #         f.write(f"An error occurred: {str(e)}\n")
 #         f.write(f"Error Details: Sub_folder: {str(sub_folder_name)}, Folder: {str(folder_name)}, Subject: {str(subject_name)}, Sig_Parameters: {str(each_sig_name)}, Pixel_Filter: {str(px_filtering_name)}\n")
-#     os.system('shutdown /s /t 20')
 
-# raw_sig = []
-# with open('UBFC2_raw_sigs.txt', 'r') as f:
-#     read = f.readlines()
-#     for x in read:
-#         sigs = ast.literal_eval(x)
-#         raw_sig.append(sigs)
+raw_sig = []
+with open('UBFC2_raw_sigs.txt', 'r') as f:
+    read = f.readlines()
+    for x in read:
+        sigs = ast.literal_eval(x)
+        raw_sig.append(sigs)
 
 i = 0
 for enum_sig_params, each_sig_params in enumerate(sig_parameters):
@@ -152,7 +150,8 @@ for enum_sig_params, each_sig_params in enumerate(sig_parameters):
                                     vid = os.path.join(subjects, subject_name)
                                 elif subject_name.endswith('.txt'):
                                     gt = os.path.join(subjects, subject_name)
-                            hrES = big_framework(input_video=vid,
+                            hrES = big_framework(#input_video=vid,
+                                                 input_video=raw_sig[enum_subject][enum_sig_params][enum_px_filter],
                                                  sig_extraction_params=each_sig_params,
                                                  px_filter=px_filtering,
                                                  windowing_params=window_params,
