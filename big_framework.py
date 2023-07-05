@@ -10,7 +10,6 @@ import os
 from sklearn.metrics import mean_absolute_error
 from CHROM import chrom_ubfc2
 import time
-from line_profiler import LineProfiler
 
 
 def big_framework(input_video, sig_extraction_params=None, px_filter=True, windowing_params=None, pre_filtering=None,
@@ -128,50 +127,62 @@ from tqdm import tqdm
 raw_sig = []
 with open('UBFC2_raw_sigs.txt', 'r') as f:
     read = f.readlines()
-    for x in read:
+    for enum, x in enumerate(read):
         sigs = ast.literal_eval(x)
         raw_sig.append(sigs)
 
-i = 0
-for enum_sig_params, each_sig_params in enumerate(sig_parameters):
-    for enum_px_filter, px_filtering in enumerate(px_filter):
-        for pre_filtering_combo in filtering_combinations:
-            for post_filtering_combo in filtering_combinations:
-                for hr_estimator in hr_estimation:
-                    for removing_outlier in outlier_removal:
-                        ground_truth_hr = []
-                        estimated_hr = []
-                        base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2'
-                        for enum_subject, folder_name in enumerate(os.listdir(base_dir)):
-                            subjects = os.path.join(base_dir, folder_name)
-                            vid, gt = None, None
-                            for subject_name in os.listdir(subjects):
-                                if subject_name.endswith('.avi'):
-                                    vid = os.path.join(subjects, subject_name)
-                                elif subject_name.endswith('.txt'):
-                                    gt = os.path.join(subjects, subject_name)
-                            hrES = big_framework(#input_video=vid,
-                                                 input_video=raw_sig[enum_subject][enum_sig_params][enum_px_filter],
-                                                 sig_extraction_params=each_sig_params,
-                                                 px_filter=px_filtering,
-                                                 windowing_params=window_params,
-                                                 pre_filtering=pre_filtering_combo,
-                                                 method='CHROM',
-                                                 post_filtering=post_filtering_combo,
-                                                 hr_estimation=hr_estimator,
-                                                 remove_outlier=removing_outlier)
-                            estimated_hr.append(np.mean(hrES))
-                            hrGT = chrom_ubfc2(ground_truth_file=gt)
-                            ground_truth_hr.append(np.mean(hrGT))
+# raw_sig2 = []
+# with open('etc/UBFC2_raw_sigs.txt', 'r') as f:
+#     read = f.readlines()
+#     for x in read:
+#         sigs = ast.literal_eval(x)
+#         raw_sig2.append(sigs)
 
-                        MAE = mean_absolute_error(ground_truth_hr, estimated_hr)
-                        i += 1
+# for a, b in enumerate(raw_sig):
+#     for c, d in enumerate(b):
+#         for e, f in enumerate(d):
+#             print(a, c, e, len(f), len(raw_sig2[a][c][e]))
 
-                        combo = [i, each_sig_params, px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier, MAE]
-                        with open('UBFC2_CHROM_permutations.csv', 'a', newline='') as f:
-                            writer = csv.writer(f)
-                            writer.writerow(combo)
-                        print(f"{(i / 13824) * 100}% or {i}/13824 or {13824 - i} left")
+# i = 0
+# for enum_sig_params, each_sig_params in enumerate(sig_parameters):
+#     for enum_px_filter, px_filtering in enumerate(px_filter):
+#         for pre_filtering_combo in filtering_combinations:
+#             for post_filtering_combo in filtering_combinations:
+#                 for hr_estimator in hr_estimation:
+#                     for removing_outlier in outlier_removal:
+#                         ground_truth_hr = []
+#                         estimated_hr = []
+#                         base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2'
+#                         for enum_subject, folder_name in enumerate(os.listdir(base_dir)):
+#                             subjects = os.path.join(base_dir, folder_name)
+#                             vid, gt = None, None
+#                             for subject_name in os.listdir(subjects):
+#                                 if subject_name.endswith('.avi'):
+#                                     vid = os.path.join(subjects, subject_name)
+#                                 elif subject_name.endswith('.txt'):
+#                                     gt = os.path.join(subjects, subject_name)
+#                             hrES = big_framework(#input_video=vid,
+#                                                  input_video=raw_sig[enum_subject][enum_sig_params][enum_px_filter],
+#                                                  sig_extraction_params=each_sig_params,
+#                                                  px_filter=px_filtering,
+#                                                  windowing_params=window_params,
+#                                                  pre_filtering=pre_filtering_combo,
+#                                                  method='CHROM',
+#                                                  post_filtering=post_filtering_combo,
+#                                                  hr_estimation=hr_estimator,
+#                                                  remove_outlier=removing_outlier)
+#                             estimated_hr.append(np.mean(hrES))
+#                             hrGT = chrom_ubfc2(ground_truth_file=gt)
+#                             ground_truth_hr.append(np.mean(hrGT))
+#
+#                         MAE = mean_absolute_error(ground_truth_hr, estimated_hr)
+#                         i += 1
+#
+#                         combo = [i, each_sig_params, px_filtering, pre_filtering_combo, post_filtering_combo, hr_estimator, removing_outlier, MAE]
+#                         with open('UBFC2_CHROM_permutations.csv', 'a', newline='') as f:
+#                             writer = csv.writer(f)
+#                             writer.writerow(combo)
+#                         print(f"{(i / 13824) * 100}% or {i}/13824 or {13824 - i} left")
 
 
 # -------------------- This is for testing -------------------- #
@@ -183,7 +194,8 @@ for enum_sig_params, each_sig_params in enumerate(sig_parameters):
 #
 # print(filtering_combinations[0])
 #
-# output = big_framework(input_video=r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2\subject01\vid.avi',
+# output = big_framework(# input_video=r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2\subject01\vid.avi',
+#                        input_video=raw_sig[0][0][0],
 #                        sig_extraction_params=sig_parameters,
 #                        px_filter=True,
 #                        windowing_params=window_params,
@@ -194,4 +206,6 @@ for enum_sig_params, each_sig_params in enumerate(sig_parameters):
 #                        remove_outlier=False)
 #
 # print(np.mean(output))
+#
+# print(np.mean(chrom_ubfc2(ground_truth_file=r"/home/svu/ilyasd01/UBFC2_GT_data/subject01/ground_truth.txt")))
 
