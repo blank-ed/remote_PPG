@@ -1,5 +1,5 @@
 from importlib import import_module
-from remote_PPG.sig_extraction_utils import *
+# from remote_PPG.sig_extraction_utils import *
 from remote_PPG.utils import *
 from remote_PPG.filters import *
 from remote_PPG.methods import *
@@ -16,18 +16,19 @@ def big_framework(input_video, sig_extraction_params=None, px_filter=True, windo
                   method='CHROM', post_filtering=None, hr_estimation='stft_estimator', remove_outlier=False,
                   dataset=None):
 
-    if dataset is None:
-        fps = get_fps(input_video)  # find the fps of the video
-    elif dataset == 'UBFC1' or dataset == 'UBFC2':
-        fps = 30
-    elif dataset == 'LGI_PPGI':
-        fps = 25
-    else:
-        assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
-                      "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
+    # if dataset is None:
+    #     fps = get_fps(input_video)  # find the fps of the video
+    # elif dataset == 'UBFC1' or dataset == 'UBFC2':
+    #     fps = 30
+    # elif dataset == 'LGI_PPGI':
+    #     fps = 25
+    # else:
+    #     assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+    #                   "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
     # raw_sig = extract_raw_sig(input_video, **sig_extraction_params, pixel_filtering=px_filter)
     raw_sig = input_video
+    fps = 30
     sig_windowing = moving_window(raw_sig, fps=fps, **windowing_params)
 
     pre_filtered_sig = apply_filters(sig_windowing, pre_filtering)
@@ -131,18 +132,6 @@ with open('UBFC2_raw_sigs.txt', 'r') as f:
         sigs = ast.literal_eval(x)
         raw_sig.append(sigs)
 
-# raw_sig2 = []
-# with open('etc/UBFC2_raw_sigs.txt', 'r') as f:
-#     read = f.readlines()
-#     for x in read:
-#         sigs = ast.literal_eval(x)
-#         raw_sig2.append(sigs)
-
-# for a, b in enumerate(raw_sig):
-#     for c, d in enumerate(b):
-#         for e, f in enumerate(d):
-#             print(a, c, e, len(f), len(raw_sig2[a][c][e]))
-
 # i = 0
 # for enum_sig_params, each_sig_params in enumerate(sig_parameters):
 #     for enum_px_filter, px_filtering in enumerate(px_filter):
@@ -187,25 +176,25 @@ with open('UBFC2_raw_sigs.txt', 'r') as f:
 
 # -------------------- This is for testing -------------------- #
 
-# sig_parameters = {'framework': 'GREEN', 'ROI_type': 'ROI_I', 'width': 1, 'height': 1}
-# window_params = {'window_size': 1.6, 'increment': 0.8}
-# filtering_methods = ['detrending_filter', 'moving_average_filter', 'butterworth_bp_filter', 'fir_bp_filter']
-# filtering_combinations = get_filtering_combinations(filtering_methods)
-#
-# print(filtering_combinations[0])
-#
-# output = big_framework(# input_video=r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2\subject01\vid.avi',
-#                        input_video=raw_sig[0][0][0],
-#                        sig_extraction_params=sig_parameters,
-#                        px_filter=True,
-#                        windowing_params=window_params,
-#                        pre_filtering=filtering_combinations[0],
-#                        method='CHROM',
-#                        post_filtering=filtering_combinations[0],
-#                        hr_estimation='stft_estimator',
-#                        remove_outlier=False)
-#
-# print(np.mean(output))
-#
-# print(np.mean(chrom_ubfc2(ground_truth_file=r"/home/svu/ilyasd01/UBFC2_GT_data/subject01/ground_truth.txt")))
+sig_parameters = {'framework': 'GREEN', 'ROI_type': 'ROI_I', 'width': 1, 'height': 1}
+window_params = {'window_size': 1.6, 'increment': 0.8}
+filtering_methods = ['detrending_filter', 'moving_average_filter', 'butterworth_bp_filter', 'fir_bp_filter']
+filtering_combinations = get_filtering_combinations(filtering_methods)
+
+print(filtering_combinations[0])
+
+output = big_framework(# input_video=r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2\subject01\vid.avi',
+                       input_video=raw_sig[0][0][0],
+                       sig_extraction_params=sig_parameters,
+                       px_filter=True,
+                       windowing_params=window_params,
+                       pre_filtering=filtering_combinations[0],
+                       method='CHROM',
+                       post_filtering=filtering_combinations[0],
+                       hr_estimation='stft_estimator',
+                       remove_outlier=False)
+
+print(np.mean(output))
+
+print(np.mean(chrom_ubfc2(ground_truth_file=r"/home/svu/ilyasd01/UBFC2_GT_data/subject01/ground_truth.txt")))
 
