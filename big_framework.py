@@ -9,6 +9,9 @@ import ast
 import os
 from sklearn.metrics import mean_absolute_error
 from CHROM import chrom_ubfc2
+from ICA_framework.ICA import ica_ubfc2
+from POS import pos_ubfc2
+from GREEN import green_ubfc2
 import time
 import sys
 
@@ -66,17 +69,22 @@ px_filter = [True, False]
 if sys.argv[2] == 'CHROM':
     window_params = {'window_size': 1.6, 'increment': 0.8}
     hr_estimation_params = {'signal_length': 12, 'increment': 1, 'bpm_type': 'continuous'}
+    ground_truth_method = getattr(import_module('remote_PPG.CHROM'), 'chrom_ubfc2')
 elif sys.argv[2] == 'POS':
     window_params = {'window_size': 1.6, 'increment': 1/30}
     hr_estimation_params = {'signal_length': 12, 'increment': 1, 'bpm_type': 'continuous'}
+    ground_truth_method = getattr(import_module('remote_PPG.POS'), 'pos_ubfc2')
 elif sys.argv[2] == 'ICA':
     window_params = {'window_size': 30, 'increment': 1}
     hr_estimation_params = {'signal_length': 30, 'increment': 1, 'bpm_type': 'continuous'}
+    ground_truth_method = getattr(import_module('remote_PPG.ICA_framework.ICA'), 'ica_ubfc2')
 
 elif sys.argv[2] == 'LiCVPR':
     hr_estimation_params = {'signal_length': 10, 'increment': 10, 'bpm_type': 'continuous'}
+    ground_truth_method = getattr(import_module('remote_PPG.LiCVPR'), 'licvpr_ubfc2')
 elif sys.argv[2] == 'GREEN':
     hr_estimation_params = {'signal_length': 6, 'increment': 1, 'bpm_type': 'average'}
+    ground_truth_method = getattr(import_module('remote_PPG.GREEN'), 'green_ubfc2')
 
 filtering_methods = ['detrending_filter', 'moving_average_filter', 'butterworth_bp_filter', 'fir_bp_filter']
 filtering_combinations = get_filtering_combinations(filtering_methods)
@@ -191,7 +199,7 @@ for enum_px_filter, px_filtering in enumerate(px_filter):
                                              hr_estimation_params=hr_estimation_params,
                                              remove_outlier=removing_outlier)
                         estimated_hr.append(np.mean(hrES))
-                        hrGT = chrom_ubfc2(ground_truth_file=gt)
+                        hrGT = ground_truth_method(ground_truth_file=gt)
                         ground_truth_hr.append(np.mean(hrGT))
 
                     MAE = mean_absolute_error(ground_truth_hr, estimated_hr)

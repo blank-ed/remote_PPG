@@ -132,11 +132,14 @@ def pos_ubfc2(ground_truth_file, sampling_frequency=30):
     gtTime = [float(item) for item in gtdata.iloc[2, 0].split(' ') if item != '']
     gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
 
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
-    frequencies, times, Zxx = stft(np.array(gtTrace), sampling_frequency, nperseg=nperseg,
-                                   noverlap=noverlap)  # Perform STFT
+
+    frequencies, times, Zxx = stft(filtered_signals, sampling_frequency, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
 
     # Detect Peaks for each time slice

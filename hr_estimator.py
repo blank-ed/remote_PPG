@@ -50,13 +50,13 @@ def outlier_removal(frequencies, magnitude):
             max_peak_index = np.argmax(peak_powers)
             max_peak_frequency = peak_freqs[max_peak_index]
 
-            hr = int(max_peak_frequency * 60)
+            hr = max_peak_frequency * 60
             prev_hr = hr
         else:
             max_peak_index = np.argmax(peak_powers)
             max_peak_frequency = peak_freqs[max_peak_index]
 
-            hr = int(max_peak_frequency * 60)
+            hr = max_peak_frequency * 60
 
             # If the difference between the current pulse rate estimation and the last computed value exceeded
             # the threshold, the algorithm rejected it and searched the operational frequency range for the
@@ -75,7 +75,7 @@ def outlier_removal(frequencies, magnitude):
 
                 max_peak_index = np.argmax(peak_powers)
                 max_peak_frequency = peak_freqs[max_peak_index]
-                hr = int(max_peak_frequency * 60)
+                hr = max_peak_frequency * 60
 
             prev_hr = hr
         hr_estimated.append(hr)

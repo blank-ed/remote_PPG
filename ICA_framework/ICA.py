@@ -203,13 +203,13 @@ def ica_ubfc1(ground_truth_file, sampling_frequency=60):
             max_peak_index = np.argmax(peak_powers)
             max_peak_frequency = peak_freqs[max_peak_index]
 
-            hr = int(max_peak_frequency * 60)
+            hr = max_peak_frequency * 60
             prev_hr = hr
         else:
             max_peak_index = np.argmax(peak_powers)
             max_peak_frequency = peak_freqs[max_peak_index]
 
-            hr = int(max_peak_frequency * 60)
+            hr = max_peak_frequency * 60
 
             # If the difference between the current pulse rate estimation and the last computed value exceeded
             # the threshold, the algorithm rejected it and searched the operational frequency range for the
@@ -228,7 +228,7 @@ def ica_ubfc1(ground_truth_file, sampling_frequency=60):
 
                 max_peak_index = np.argmax(peak_powers)
                 max_peak_frequency = peak_freqs[max_peak_index]
-                hr = int(max_peak_frequency * 60)
+                hr = max_peak_frequency * 60
 
             prev_hr = hr
         hrGT.append(hr)
@@ -275,7 +275,7 @@ def ica_ubfc2(ground_truth_file, sampling_frequency=30):
             max_peak_index = np.argmax(peak_powers)
             max_peak_frequency = peak_freqs[max_peak_index]
 
-            hr = int(max_peak_frequency * 60)
+            hr = max_peak_frequency * 60
 
             # If the difference between the current pulse rate estimation and the last computed value exceeded
             # the threshold, the algorithm rejected it and searched the operational frequency range for the
@@ -294,7 +294,7 @@ def ica_ubfc2(ground_truth_file, sampling_frequency=30):
 
                 max_peak_index = np.argmax(peak_powers)
                 max_peak_frequency = peak_freqs[max_peak_index]
-                hr = int(max_peak_frequency * 60)
+                hr = max_peak_frequency * 60
 
             prev_hr = hr
         hrGT.append(hr)
