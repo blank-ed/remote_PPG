@@ -83,34 +83,55 @@ def outlier_removal(frequencies, magnitude):
     return hr_estimated
 
 
+def detect_peaks(frequencies, magnitude):
+    # Detect Peaks for each time slice
+    hr = []
+    for i in range(magnitude.shape[1]):
+        mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+        masked_frequencies = frequencies[mask]
+        masked_magnitude = magnitude[mask, i]
+
+        peaks, _ = find_peaks(masked_magnitude)
+        if len(peaks) > 0:
+            peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
+            hr.append(peak_freq * 60)
+        else:
+            if hr:
+                hr.append(hr[-1])  # append the last recorded hr value
+            else:
+                continue  # skip the iteration if there are no peaks and no previous hr values
+
+    return hr
+
+
 def stft_estimator(signal, fps, remove_outlier, signal_length=None, increment=None):
 
-    # Compute STFT
-    noverlap = fps * (signal_length - increment)
-    nperseg = fps * signal_length  # Length of fourier window
+    if signal.ndim == 1:
+        noverlap = fps * (signal_length - increment)
+        nperseg = fps * signal_length  # Length of fourier window
 
-    frequencies, times, Zxx = stft(signal, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
-    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+        frequencies, times, Zxx = stft(signal, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+        magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    elif signal.ndim == 2:
+        frequencies = []
+        magnitude_Zxx = []
+
+        for window in signal:
+            freqs, Zxx = np.fft.rfft(window, fps)  # Compute the one-dimensional n-point discrete Fourier Transform for real input
+            magnitudes = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+            frequencies.append(freqs)
+            magnitude_Zxx.append(magnitudes)
+
+    else:
+        raise ValueError("Signal must be either 1D or 2D array")
+
 
     if remove_outlier:
-        hr = outlier_removal(frequencies, magnitude_Zxx)
+        hr = outlier_removal(np.array(frequencies), np.array(magnitude_Zxx))
     else:
-        # Detect Peaks for each time slice
-        hr = []
-        for i in range(magnitude_Zxx.shape[1]):
-            mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
-            masked_frequencies = frequencies[mask]
-            masked_magnitude = magnitude_Zxx[mask, i]
-
-            peaks, _ = find_peaks(masked_magnitude)
-            if len(peaks) > 0:
-                peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
-                hr.append(peak_freq * 60)
-            else:
-                if hr:
-                    hr.append(hr[-1])  # append the last recorded hr value
-                else:
-                    continue  # skip the iteration if there are no peaks and no previous hr values
+        hr = detect_peaks(frequencies, magnitude_Zxx)
 
     return hr
 
