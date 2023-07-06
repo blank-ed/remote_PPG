@@ -2,12 +2,13 @@ from importlib import import_module
 import numpy as np
 from scipy.signal import firwin, filtfilt, medfilt, butter
 import cv2
+from scipy.sparse import spdiags
 
 
 def apply_filters(signal, combination):
-    if signal.ndim == 3:
+    if signal.ndim == 3 or signal.ndim == 2:
         filtered = [apply_filter_to_signal(each_window, combination) for each_window in signal]
-    else:
+    else:  # This is for GREEN and LiCVPR since they don't have signal windowing
         filtered = apply_filter_to_signal(signal, combination)
 
     return np.array(filtered)
@@ -86,29 +87,38 @@ def butterworth_bp_filter(signal, fps, low=0.8, high=2.0, order=4):
 def detrending_filter(signal, Lambda=300):
     """
     This code is based on the following article "An advanced detrending method with application to HRV analysis".
-    Tarvainen et al., IEEE Trans on Biomedical Engineering, 2002 and is taken from bob.rppg.base
+    Tarvainen et al., IEEE Trans on Biomedical Engineering, 2002.
 
     :param signal: numpy.ndarray
-        The signal where you want to remove the trend.
+        The signal where you want to remove the trend. This can be a 1D or 2D array.
     :param Lambda: int
         The smoothing parameter.
     :return filtered_signal: numpy.ndarray
         The detrended signal.
     """
 
-    signal_length = signal.shape[0]
+    # Check if the signal is 1D or 2D.
+    if len(signal.shape) == 1:
+        # The signal is 1D. Process it directly.
+        signal_length = signal.shape[0]
 
-    # observation matrix
-    H = np.identity(signal_length)
+        # observation matrix
+        H = np.identity(signal_length)
 
-    # second-order difference matrix
-    from scipy.sparse import spdiags
-    ones = np.ones(signal_length)
-    minus_twos = -2 * np.ones(signal_length)
-    diags_data = np.array([ones, minus_twos, ones])
-    diags_index = np.array([0, 1, 2])
-    D = spdiags(diags_data, diags_index, (signal_length - 2), signal_length).toarray()
-    filtered_signal = np.dot((H - np.linalg.inv(H + (Lambda ** 2) * np.dot(D.T, D))), signal)
+        # second-order difference matrix
+        ones = np.ones(signal_length)
+        minus_twos = -2 * np.ones(signal_length)
+        diags_data = np.array([ones, minus_twos, ones])
+        diags_index = np.array([0, 1, 2])
+        D = spdiags(diags_data, diags_index, (signal_length - 2), signal_length).toarray()
+        filtered_signal = np.dot((H - np.linalg.inv(H + (Lambda ** 2) * np.dot(D.T, D))), signal)
+    else:
+        # The signal is 2D. Process each column separately.
+        n_signals = signal.shape[1]
+        filtered_signal = np.empty_like(signal)
+        for i in range(n_signals):
+            filtered_signal[:, i] = detrending_filter(signal[:, i], Lambda)
+
     return filtered_signal
 
 

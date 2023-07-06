@@ -16,7 +16,7 @@ def profile_print(func_to_call, *args, **kwargs):
 def CHROM(signal, fps, **params):
 
     w, l, c = signal.shape
-    N = int(params['increment'] * fps * (w + 1))
+    N = int(l + (w - 1) * (params['increment'] * fps))
     H = np.zeros(N)
 
     for enum, each_window in enumerate(signal):
@@ -47,15 +47,15 @@ def CHROM(signal, fps, **params):
 def POS(signal, fps, **params):
 
     w, l, c = signal.shape
-    N = params['increment'] * fps * (w + 1)
+    N = int(l + (w - 1) * (params['increment'] * fps))
     H = np.zeros(N)
 
     for enum, each_window in enumerate(signal):
         normalized = normalize(signal=each_window, normalize_type='mean_normalization')  # Normalize each windowed segment
 
         # Projection
-        S1 = normalized[:, 1] - normalized[:, 2]
-        S2 = normalized[:, 1] + normalized[:, 2] - 2 * normalized[:, 0]
+        S1 = normalized[1] - normalized[2]
+        S2 = normalized[1] + normalized[2] - 2 * normalized[0]
 
         alpha = np.std(S1) / np.std(S2)
         h = S1 + alpha * S2
@@ -68,7 +68,7 @@ def POS(signal, fps, **params):
     return H
 
 
-def ICA(signal, **params):
+def ICA(signal):
 
     comp = 1  # Change this to take in the comp from params
 
@@ -80,16 +80,12 @@ def ICA(signal, **params):
         W = jadeR(normalized, m=3)
         bvp.append(np.array(np.dot(W, normalized))[comp].flatten())
 
-    return bvp
+    return np.array(bvp)
 
 
 def GREEN(signal):
 
-    bvp = []
-    for each_window in signal:
-        bvp.append(each_window[:, 1])
-
-    return bvp
+    return np.array(signal)
 
 
 def LiCVPR(signal, bg_signal):

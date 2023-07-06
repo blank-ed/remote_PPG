@@ -5,15 +5,16 @@ from scipy.fft import rfft, rfftfreq
 from remote_PPG.utils import *
 
 
-def get_bpm(signal, fps, type, remove_outlier, bpm_type='continuous'):
+def get_bpm(signal, fps, type, remove_outlier, params):
 
     estimator_module = import_module('remote_PPG.hr_estimator')
     estimator_method = getattr(estimator_module, type)
 
-    if type == 'stft_estimator':
-        hr = estimator_method(signal, fps, remove_outlier)
+    if type == 'stft_estimator' and 'bpm_type' in params:
+        del params['bpm_type']  # Delete bpm type since stft will give continuous hr values
+        hr = estimator_method(signal, fps, remove_outlier, **params)
     else:
-        hr = estimator_method(signal, fps, remove_outlier, bpm_type)
+        hr = estimator_method(signal, fps, remove_outlier, **params)
 
     return hr
 
@@ -82,11 +83,11 @@ def outlier_removal(frequencies, magnitude):
     return hr_estimated
 
 
-def stft_estimator(signal, fps, remove_outlier):
+def stft_estimator(signal, fps, remove_outlier, signal_length=None, increment=None):
 
     # Compute STFT
-    noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
-    nperseg = fps * 12  # Length of fourier window (12 seconds as per the paper)
+    noverlap = fps * (signal_length - increment)
+    nperseg = fps * signal_length  # Length of fourier window
 
     frequencies, times, Zxx = stft(signal, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
     magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
@@ -114,7 +115,7 @@ def stft_estimator(signal, fps, remove_outlier):
     return hr
 
 
-def fft_estimator(signal, fps, remove_outlier, bpm_type):
+def fft_estimator(signal, fps, remove_outlier, bpm_type, signal_length=None, increment=None):
 
     if bpm_type == 'average':
         # Compute the positive frequencies and the corresponding power spectrum
@@ -135,11 +136,15 @@ def fft_estimator(signal, fps, remove_outlier, bpm_type):
         hr = int(max_peak_frequency * 60)
 
     elif bpm_type == 'continuous':
-        windowed_sig = moving_window(sig=signal, fps=fps, window_size=12, increment=11)
+        if signal.ndim == 2:
+            windowed_sig = signal
+        else:
+            windowed_sig = moving_window(sig=signal, fps=fps, window_size=signal_length, increment=increment)
 
         frequencies = []
         magnitude = []
         hr = []
+        prev_hr = None
 
         for each_sig in windowed_sig:
             # Compute the positive frequencies and the corresponding power spectrum
@@ -159,6 +164,12 @@ def fft_estimator(signal, fps, remove_outlier, bpm_type):
                 filtered_freqs = freqs[mask]
 
                 peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
+
+                if len(peaks) == 0:
+                    if prev_hr is not None:
+                        hr.append(prev_hr)
+                    continue
+
                 peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
                 peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
 
@@ -169,7 +180,7 @@ def fft_estimator(signal, fps, remove_outlier, bpm_type):
     return hr
 
 
-def welch_estimator(signal, fps, remove_outlier, bpm_type):
+def welch_estimator(signal, fps, remove_outlier, bpm_type, signal_length=None, increment=None):
 
     if bpm_type == 'average':
         frequencies, psd = welch(signal, fs=fps, nperseg=len(signal), nfft=8192)
@@ -184,7 +195,10 @@ def welch_estimator(signal, fps, remove_outlier, bpm_type):
         hr = f_max * 60.0
 
     elif bpm_type == 'continuous':
-        windowed_sig = moving_window(sig=signal, fps=fps, window_size=12, increment=11)
+        if signal.ndim == 2:
+            windowed_sig = signal
+        else:
+            windowed_sig = moving_window(sig=signal, fps=fps, window_size=signal_length, increment=increment)
 
         frequencies = []
         magnitude = []
