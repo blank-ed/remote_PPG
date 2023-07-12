@@ -48,6 +48,11 @@ def extract_raw_sig(input_video, framework=None, ROI_type='None', width=1, heigh
             Returns the averaged raw RGB signal from the ROI
     """
 
+    if 'subject31' in input_video:
+        scaleFactor = 1.3
+    else:
+        scaleFactor = 1.1
+
     raw_sig = []
 
     mp_face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
@@ -63,11 +68,13 @@ def extract_raw_sig(input_video, framework=None, ROI_type='None', width=1, heigh
     frame_count = 0
     usable_roi_count = 0
 
-    for frame in extract_frames_yield(input_video):
+    # for frame in extract_frames_yield(input_video):
+    for frame in input_video:
+        frame = cv2.imread(frame)
         frame_count += 1
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=scaleFactor, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
 
         # Look through the first 200 frames until face is detected
         if len(faces) == 0 and frame_count <= 200:

@@ -45,7 +45,10 @@ def big_framework(input_video, sig_extraction_params=None, px_filter=True, windo
 
     bvp_module = import_module('remote_PPG.methods')
     bvp_method = getattr(bvp_module, method)
-    bvp = bvp_method(pre_filtered_sig, fps, **windowing_params)
+    if method == 'ICA' or method == 'GREEN':
+        bvp = bvp_method(pre_filtered_sig)
+    else:
+        bvp = bvp_method(pre_filtered_sig, fps, **windowing_params)
 
     post_filtered_sig = apply_filters(bvp, post_filtering)
 
@@ -65,6 +68,8 @@ sig_parameters = [{'framework': 'CHROM', 'ROI_type': 'None', 'width': 1, 'height
                   {'framework': 'LiCVPR', 'ROI_type': 'None', 'width': 1, 'height': 1}]
 
 px_filter = [True, False]
+
+sys.argv = [0, 4, 'CHROM']
 
 if sys.argv[2] == 'CHROM':
     window_params = {'window_size': 1.6, 'increment': 0.8}
@@ -159,8 +164,8 @@ from tqdm import tqdm
 #         f.write(f"Error Details: Sub_folder: {str(sub_folder_name)}, Folder: {str(folder_name)}, Subject: {str(subject_name)}, Sig_Parameters: {str(each_sig_name)}, Pixel_Filter: {str(px_filtering_name)}\n")
 
 raw_sig = []
-# with open('UBFC2_raw_sigs.txt', 'r') as f:
-with open("/home/svu/ilyasd01/new/remote_PPG/UBFC2_raw_sigs.txt", 'r') as f:
+with open('UBFC2_raw_sigs.txt', 'r') as f:
+# with open("/home/svu/ilyasd01/new/remote_PPG/UBFC2_raw_sigs.txt", 'r') as f:
     read = f.readlines()
     for enum, x in enumerate(read):
         sigs = ast.literal_eval(x)
@@ -175,8 +180,8 @@ for enum_px_filter, px_filtering in enumerate(px_filter):
                 for removing_outlier in outlier_removal:
                     ground_truth_hr = []
                     estimated_hr = []
-                    # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2'
-                    base_dir = "/home/svu/ilyasd01/UBFC2_GT_data/"
+                    base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET\UBFC2'
+                    # base_dir = "/home/svu/ilyasd01/UBFC2_GT_data/"
                     folders = os.listdir(base_dir)
                     folders.sort()
                     for enum_subject, folder_name in enumerate(folders):
@@ -206,9 +211,9 @@ for enum_px_filter, px_filtering in enumerate(px_filter):
                     i += 1
 
                     combo = [i, sig_parameters[int(sys.argv[1])], px_filtering, pre_filtering_combo, sys.argv[2], post_filtering_combo, hr_estimator, hr_estimation_params, removing_outlier, MAE]
-                    with open(f'UBFC2_{sys.argv[2]}_permutations_{sys.argv[1]}.csv', 'a', newline='') as f:
-                        writer = csv.writer(f)
-                        writer.writerow(combo)
+                    # with open(f'UBFC2_{sys.argv[2]}_permutations_{sys.argv[1]}.csv', 'a', newline='') as f:
+                    #     writer = csv.writer(f)
+                    #     writer.writerow(combo)
                     # print(f"{(i / 13824) * 100}% or {i}/13824 or {13824 - i} left")
 
 

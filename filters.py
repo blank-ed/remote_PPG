@@ -7,7 +7,7 @@ from scipy.sparse import spdiags
 
 def apply_filters(signal, combination):
     if signal.ndim == 3 or signal.ndim == 2:
-        filtered = [apply_filter_to_signal(each_window, combination) for each_window in signal]
+        filtered = np.array([apply_filter_to_signal(each_window, combination) for each_window in signal])
     else:  # This is for GREEN and LiCVPR since they don't have signal windowing
         filtered = apply_filter_to_signal(signal, combination)
 

@@ -5,7 +5,9 @@ also known as GREEN rPPG by other research papers. This is the closest implement
 framework that has been proposed.
 
 """
-from scipy.signal import welch
+import json
+
+from scipy.signal import welch, find_peaks, stft
 from scipy.signal.windows import windows
 from remote_PPG.sig_extraction_utils import *
 from remote_PPG.utils import *
@@ -104,7 +106,7 @@ def green_framework(input_video, roi_type='ROI_I', signal='bp', lower_frequency=
 
     if dataset is None:
         fps = get_fps(input_video)  # find the fps of the video
-    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+    elif dataset == 'UBFC1' or dataset == 'UBFC2' or dataset == 'PURE':
         fps = 30
     elif dataset == 'LGI_PPGI':
         fps = 25
@@ -151,6 +153,80 @@ def green_framework(input_video, roi_type='ROI_I', signal='bp', lower_frequency=
     max_idx = np.argmax(power_spectrum_range)
     f_max = frequencies_range[max_idx]
     hr = f_max * 60.0
+
+    return hr
+
+
+def green_framework2(input_video, roi_type='ROI_I', signal='bp', lower_frequency=0.8, higher_frequency=2.0,
+                    dataset=None):
+    """
+    :param input_video:
+        This takes in an input video file
+    :param roi_type:
+        Select the type of ROI to extract the green channel signal from:
+        - 'ROI_I': forehead bounding box
+        - 'ROI_II': single pixel in the forehead ROI
+        - 'ROI_III': beside head (This doesn't include any skin pixels, only the background)
+        - 'ROI_IV': whole frame scaled down by a fraction
+    :param signal:
+        Select the type of signal to extract the heart rate from:
+        - 'raw': PV_raw(t) no processing other than spatial averaging over ROI
+        - 'ac': PV_AC(t) the mean over time of PV_raw(t) is subtracted (= PV_raw(t) minus DC)
+        - 'bp': PV_BP(t) band-pass filtered PV_raw(t) signal. For the band-pass (BP) filter Butterworth coefficients
+                (4th order) were used in a phase with the specified lower and higher frequencies.
+    :param lower_frequency:
+        This is the low frequency level
+    :param higher_frequency:
+        This is the high frequency level
+    :return:
+        Returns the estimated heart rate of the input video based on GREEN framework
+    """
+
+    raw_sig = extract_raw_sig(input_video, framework='LiCVPR', ROI_type='None', width=1, height=1, pixel_filtering=False)
+    raw_sig = np.array(raw_sig)[:, 1]  # Select the green channel
+
+    if dataset is None:
+        fps = get_fps(input_video)  # find the fps of the video
+    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+        fps = 30
+    elif dataset == 'LGI_PPGI':
+        fps = 25
+    else:
+        assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
+                      "types: 'UBFC1', 'UBFC2'. If you are using your own dataset, enter 'None' "
+
+    detrended = detrending_filter(raw_sig)
+    moving_averaged = moving_average_filter(detrended)
+
+    detrended2 = detrending_filter(moving_averaged)
+    moving_averaged2 = moving_average_filter(detrended2)
+    filtered = fir_bp_filter(moving_averaged2, fps)
+
+    noverlap = fps * (6 - 1)
+    nperseg = fps * 6  # Length of fourier window
+
+    frequencies, times, Zxx = stft(filtered, fps, nperseg=nperseg, noverlap=noverlap)  # Perform STFT
+    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    # Detect Peaks for each time slice
+    hr = []
+
+    for i in range(min(magnitude_Zxx.shape)):
+
+        mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+        masked_frequencies = frequencies[mask]
+        masked_magnitude = magnitude_Zxx[mask, i]
+
+        peaks, _ = find_peaks(masked_magnitude)
+        if len(peaks) > 0:
+            peak_freq = masked_frequencies[peaks[np.argmax(masked_magnitude[peaks])]]
+            hr.append(peak_freq * 60)
+        else:
+            if hr:
+                hr.append(hr[-1])  # append the last recorded hr value
+            else:
+                continue  # skip the iteration if there are no peaks and no previous hr values
+
 
     return hr
 
@@ -302,6 +378,57 @@ def green_lgi_ppgi(ground_truth_file, sampling_frequency=60, signal='bp', lower_
     return hrGT
 
 
+def green_pure(ground_truth_file, sampling_frequency=60, signal='bp', lower_frequency=0.8, higher_frequency=2.0):
+    with open(ground_truth_file) as f:
+        data = json.load(f)
+
+    gtTime = [gtdata["Timestamp"] for gtdata in data['/FullPackage']]
+    gtHR = [gtdata["Value"]["pulseRate"] for gtdata in data['/FullPackage']]
+    gtTrace = [gtdata["Value"]["waveform"] for gtdata in data['/FullPackage']]
+
+    pv_raw = gtTrace
+    pv_ac = (np.array(pv_raw) - np.mean(pv_raw)).tolist()
+    pv_bp = butterworth_bp_filter(pv_raw, fps=sampling_frequency, low=lower_frequency, high=higher_frequency)
+
+    # Perform the FFT on selected signal
+    if signal == 'raw':
+        fft_pv = fft(pv_raw)
+    elif signal == 'ac':
+        fft_pv = fft(pv_ac)
+    elif signal == 'bp':
+        fft_pv = fft(pv_bp)
+    else:
+        assert False, "Invalid signal type for the 'GREEN' framework. Please choose one of the valid signals " \
+                      "types: 'raw' (for raw G signal), 'ac' (removed DC component), or 'bp' (bandpass filtered " \
+                      "raw signal with the specified lower and higher frequency) "
+
+    # Calculate the power spectrum by taking the absolute square of the FFT
+    power_spectrum = np.abs(fft_pv) ** 2
+
+    # Calculate the corresponding frequencies
+    frequencies = fftfreq(len(pv_bp), d=1 / sampling_frequency)
+
+    # Display only the positive frequencies and corresponding power spectrum
+    positive_frequencies = frequencies[:len(frequencies) // 2]  # Take only the first half
+    positive_spectrum = power_spectrum[:len(power_spectrum) // 2]  # Take only the first half
+
+    freq_range = (lower_frequency, higher_frequency)  # Frequency range
+
+    # Find the indices corresponding to the desired frequency range
+    start_idx = np.argmax(positive_frequencies >= freq_range[0])
+    end_idx = np.argmax(positive_frequencies >= freq_range[1])
+
+    # Extract the frequencies and power spectrum within the desired range
+    frequencies_range = positive_frequencies[start_idx:end_idx]
+    power_spectrum_range = positive_spectrum[start_idx:end_idx]
+
+    max_idx = np.argmax(power_spectrum_range)
+    f_max = frequencies_range[max_idx]
+    hrGT = f_max * 60.0
+
+    return hrGT
+
+
 green_true = []
 green_pred = []
 # # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
@@ -334,15 +461,17 @@ green_pred = []
 #                     gt = os.path.join(subjects, each_subject)
 #
 #             print(vid, gt)
-#             hrES = green_framework(input_video=vid, dataset='UBFC2')
+#             hrES = green_framework2(input_video=vid, dataset='UBFC2')
 #             hrGT = green_ubfc2(ground_truth_file=gt)
 #             # print(len(hrGT), len(hrES))
 #             print('')
-#             green_true.append(hrGT)
-#             green_pred.append(hrES)
+#             # green_true.append(hrGT)
+#             # green_pred.append(hrES)
+#             green_true.append(np.mean(hrGT))
+#             green_pred.append(np.mean(hrES))
 #
 # print(mean_absolute_error(green_true, green_pred))
-# # print(mean_absolute_error(green_true[8:], green_pred[8:]))
+# print(mean_absolute_error(green_true[8:], green_pred[8:]))
 # print(green_true)
 # print(green_pred)
 
@@ -350,6 +479,8 @@ green_pred = []
 # 15.14179822781124
 # [73.75071797817347, 81.81818181818181, 91.26365054602184, 56.593886462882104, 68.97069872276484, 73.57243037467441, 92.20103986135183, 97.0974808324206, 110.53652230122819, 88.9505830094392, 103.94736842105263, 101.03225806451613, 112.16617210682492, 107.14285714285714, 109.38735177865613, 114.32791728212702, 67.87330316742081, 109.71258671952428, 77.67185148018062, 112.27722772277228, 92.19512195121952, 88.85630498533725, 107.07964601769912, 112.5, 106.2992125984252, 60.67415730337079, 110.20408163265306, 113.12154696132596, 100.60606060606061, 111.94968553459118, 102.95857988165682, 77.25703009373458, 100.93457943925233, 113.4567283641821, 114.987714987715, 110.580204778157, 119.29824561403508, 55.80708661417323, 111.51219512195122, 84.83063328424153, 87.86982248520711, 99.85272459499262, 98.72673849167484, 103.03633648581385, 77.64005949429847, 111.61417322834646, 91.31089904570568, 104.99258526940187, 92.02453987730061, 85.84070796460178]
 # [79.95018679950188, 54.38522870331514, 59.44115156646909, 68.53879105188005, 74.87765089722676, 79.82608695652173, 48.99497487437186, 61.99524940617578, 110.53652230122819, 88.9505830094392, 92.10526315789473, 68.51612903225808, 112.16617210682492, 105.35714285714286, 80.9288537549407, 53.17577548005908, 69.68325791855204, 109.71258671952428, 62.3181133968891, 53.62462760675274, 92.19512195121952, 88.85630498533725, 56.63716814159292, 57.14285714285714, 104.5275590551181, 61.59346271705822, 110.20408163265306, 113.12154696132596, 100.60606060606061, 50.31446540880503, 56.80473372781066, 76.36901825357671, 100.93457943925233, 113.4567283641821, 114.987714987715, 60.555826426133606, 119.29824561403508, 53.84615384615384, 54.4390243902439, 84.83063328424153, 87.86982248520711, 99.85272459499262, 98.72673849167484, 69.88551518168244, 77.64005949429847, 111.61417322834646, 94.02310396785535, 111.22095897182402, 60.736196319018404, 61.06194690265487]
+
+# [13388, "{'framework': 'LiCVPR', 'ROI_type': 'None', 'width': 1, 'height': 1}", False, "('detrending_filter', 'moving_average_filter')", 'GREEN', "('detrending_filter', 'moving_average_filter', 'fir_bp_filter')", 'stft_estimator', "{'signal_length': 6, 'increment': 1, 'bpm_type': 'average'}", False, 4.15841702903006]
 
 # Improved
 # [110.53652230122819, 88.9505830094392, 103.94736842105263, 101.03225806451613, 112.16617210682492, 107.14285714285714, 109.38735177865613, 114.32791728212702, 67.87330316742081, 109.71258671952428, 77.67185148018062, 112.27722772277228, 92.19512195121952, 88.85630498533725, 107.07964601769912, 112.5, 106.2992125984252, 60.67415730337079, 110.20408163265306, 113.12154696132596, 100.60606060606061, 111.94968553459118, 102.95857988165682, 77.25703009373458, 100.93457943925233, 113.4567283641821, 114.987714987715, 110.580204778157, 119.29824561403508, 55.80708661417323, 111.51219512195122, 84.83063328424153, 87.86982248520711, 99.85272459499262, 98.72673849167484, 103.03633648581385, 77.64005949429847, 111.61417322834646, 91.31089904570568, 104.99258526940187, 92.02453987730061, 85.84070796460178]
@@ -398,3 +529,30 @@ green_pred = []
 # resting: 11.967340529588228
 # rotation: 5.967234151447599
 # talk: 7.659555195804305
+
+base_dir = r"C:\Users\Admin\Desktop\PURE Dataset"
+subjects = ["{:02d}".format(i) for i in range(1, 11)]
+setups = ["{:02d}".format(i) for i in range(1, 7)]
+
+for each_setup in setups:
+    for each_subject in subjects:
+        if f"{each_subject}-{each_setup}" == "06-02":
+            continue
+        dir = os.listdir(os.path.join(base_dir, f"{each_subject}-{each_setup}"))
+        vid = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[0])
+        gt = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[1])
+
+        # print(vid, gt)
+
+        input_video = [os.path.join(vid, x) for x in os.listdir(vid)]
+        hrES = green_framework(input_video, dataset='PURE')
+        green_pred.append(np.mean(hrES))
+
+        hrGT = green_pure(ground_truth_file=gt)
+        green_true.append(np.mean(hrGT))
+
+        print(len(hrGT), len(hrES))
+
+print(green_true)
+print(green_pred)
+print(mean_absolute_error(green_true, green_pred))

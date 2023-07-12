@@ -13,12 +13,12 @@ from remote_PPG.utils import *
 
 def pos_framework(input_video, dataset=None):
 
-    # raw_sig = extract_raw_sig(input_video, framework='POS', width=1, height=1)
-    raw_sig = extract_raw_sig(input_video, framework='GREEN', ROI_type='ROI_I')  # MOD ---------------------------------
+    raw_sig = extract_raw_sig(input_video, framework='POS', width=1, height=1)
+    # raw_sig = extract_raw_sig(input_video, framework='GREEN', ROI_type='ROI_I')  # MOD ---------------------------------
 
     if dataset is None:
         fps = get_fps(input_video)  # find the fps of the video
-    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+    elif dataset == 'UBFC1' or dataset == 'UBFC2' or dataset == 'PURE':
         fps = 30
     elif dataset == 'LGI_PPGI':
         fps = 25
@@ -26,50 +26,29 @@ def pos_framework(input_video, dataset=None):
         assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
                       "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
-    N = len(raw_sig)
-    H = np.zeros(N)
-    l = int(fps * 1.6)
-
     window = moving_window(raw_sig, fps=fps, window_size=1.6, increment=1/fps)
 
+    w, l, c = window.shape
+    N = int(l + (w - 1) * (0.8 * fps))
+    H = np.zeros(N)
+
     for enum, each_window in enumerate(window):
-        normalized = normalize(signal=each_window, framework='POS')  # Normalize each windowed segment
+        normalized = normalize(signal=each_window, normalize_type='mean_normalization')  # Normalize each windowed segment
 
         # Projection
         S1 = normalized[:, 1] - normalized[:, 2]
         S2 = normalized[:, 1] + normalized[:, 2] - 2 * normalized[:, 0]
 
-        S1_filtered = fir_bp_filter(signal=S1, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
-        S2_filtered = fir_bp_filter(signal=S2, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
+        # S1_filtered = fir_bp_filter(signal=S1, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
+        # S2_filtered = fir_bp_filter(signal=S2, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
 
-        alpha = np.std(S1_filtered) / np.std(S2_filtered)
-        h = S1_filtered + alpha * S2_filtered
+        alpha = np.std(S1) / np.std(S2)
+        h = S1 + alpha * S2
 
         start = enum
         end = enum + l
 
         H[start:end] += (h - np.mean(h))
-
-
-
-    # for n in range(0, N):
-    #     m = n - l + 1
-    #     if n - l + 1 > 0:
-    #         # Temporal normalization
-    #         Cn = np.array(raw_sig[m:n + 1]) / np.mean(np.array(raw_sig[m:n + 1]))
-    #
-    #         # Projection
-    #         S1 = Cn[:, 1] - Cn[:, 2]
-    #         S2 = Cn[:, 1] + Cn[:, 2] - 2 * Cn[:, 0]
-    #
-    #         S1_filtered = fir_bp_filter(signal=S1, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
-    #         S2_filtered = fir_bp_filter(signal=S2, fps=fps, low=0.67, high=4.0)  # MOD ---------------------------------
-    #
-    #         alpha = np.std(S1_filtered) / np.std(S2_filtered)
-    #         h = S1_filtered + alpha * S2_filtered
-    #
-    #         # Overlap-Adding
-    #         H[m:n + 1] += (h - np.mean(h))
 
     # Compute STFT
     noverlap = fps * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -100,6 +79,7 @@ import pandas as pd
 import os
 from sklearn.metrics import mean_absolute_error
 from scipy.signal import windows
+import json
 
 def pos_ubfc1(ground_truth_file, sampling_frequency=60):
     gtdata = pd.read_csv(ground_truth_file, header=None)
@@ -180,6 +160,40 @@ def pos_lgi_ppgi(ground_truth_file, sampling_frequency=60):
             hrGT.append(None)
 
     return hrGT
+
+
+def pos_pure(ground_truth_file, sampling_frequency=60):
+    with open(ground_truth_file) as f:
+        data = json.load(f)
+
+    gtTime = [gtdata["Timestamp"] for gtdata in data['/FullPackage']]
+    gtHR = [gtdata["Value"]["pulseRate"] for gtdata in data['/FullPackage']]
+    gtTrace = [gtdata["Value"]["waveform"] for gtdata in data['/FullPackage']]
+
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+
+    # Compute STFT
+    noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
+
+    # Perform STFT
+    frequencies, times, Zxx = stft(filtered_signals, sampling_frequency, nperseg=nperseg, noverlap=noverlap)
+
+    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    # Detect Peaks for each time slice
+    hrGT = []
+    for i in range(magnitude_Zxx.shape[1]):
+        peaks, _ = find_peaks(magnitude_Zxx[:, i])
+        if len(peaks) > 0:
+            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+            hrGT.append(peak_freq * 60)
+        else:
+            hrGT.append(None)
+
+    return hrGT
+
 
 pos_true = []
 pos_pred = []
@@ -283,6 +297,34 @@ pos_pred = []
 # resting: 5.196354470933181
 # rotation: 8.29033740591247
 # talk: 5.235323057850636
+
+
+base_dir = r"C:\Users\Admin\Desktop\PURE Dataset"
+subjects = ["{:02d}".format(i) for i in range(1, 11)]
+setups = ["{:02d}".format(i) for i in range(1, 7)]
+
+for each_setup in setups:
+    for each_subject in subjects:
+        if f"{each_subject}-{each_setup}" == "06-02":
+            continue
+        dir = os.listdir(os.path.join(base_dir, f"{each_subject}-{each_setup}"))
+        vid = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[0])
+        gt = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[1])
+
+        # print(vid, gt)
+
+        input_video = [os.path.join(vid, x) for x in os.listdir(vid)]
+        hrES = pos_framework(input_video, dataset='PURE')
+        pos_pred.append(np.mean(hrES))
+
+        hrGT = pos_pure(ground_truth_file=gt)
+        pos_true.append(np.mean(hrGT))
+
+        print(len(hrGT), len(hrES))
+
+print(pos_true)
+print(pos_pred)
+print(mean_absolute_error(pos_true, pos_pred))
 
 
 ### END TEST SECTION

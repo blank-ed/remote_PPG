@@ -10,6 +10,7 @@ from scipy.signal import find_peaks, welch, windows, stft
 from remote_PPG.sig_extraction_utils import *
 from remote_PPG.utils import *
 import numpy as np
+import json
 
 
 def chrom_framework(input_video, subject_type='motion', dataset=None):
@@ -39,7 +40,7 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
         raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)  # Get the raw RGB signals
         if dataset is None:
             fps = get_fps(input_video)  # find the fps of the video
-        elif dataset == 'UBFC1' or dataset == 'UBFC2':
+        elif dataset == 'UBFC1' or dataset == 'UBFC2' or dataset == 'PURE':
             fps = 30
         elif dataset == 'LGI_PPGI':
             fps = 25
@@ -74,12 +75,12 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
 
     elif subject_type == 'motion':
 
-        # raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)
-        raw_sig = extract_raw_sig(input_video, framework='GREEN', ROI_type='ROI_I')  # MOD ----------------------------
+        raw_sig = extract_raw_sig(input_video, framework='CHROM', width=1, height=1)
+        # raw_sig = extract_raw_sig(input_video, framework='GREEN', ROI_type='ROI_I', width=1, height=1, pixel_filtering=True)  # MOD ----------------------------
 
         if dataset is None:
             fps = get_fps(input_video)  # find the fps of the video
-        elif dataset == 'UBFC1' or dataset == 'UBFC2':
+        elif dataset == 'UBFC1' or dataset == 'UBFC2' or dataset == 'PURE':
             fps = 30
         elif dataset == 'LGI_PPGI':
             fps = 25
@@ -87,11 +88,11 @@ def chrom_framework(input_video, subject_type='motion', dataset=None):
             assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
                           "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
-        N = len(raw_sig)
-        H = np.zeros(N)
-        l = int(fps * 1.6)
-
         window = moving_window(raw_sig, fps=fps, window_size=1.6, increment=0.8)
+
+        w, l, c = window.shape
+        N = int(l + (w - 1) * (0.8 * fps))
+        H = np.zeros(N)
 
         for enum, each_window in enumerate(window):
             normalized = normalize(signal=each_window, normalize_type='mean_normalization')  # Normalize each windowed segment
@@ -267,9 +268,42 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     return hrGT
 
 
-# chrom_true = []
-# # chrom_pred = []
-# # # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
+def chrom_pure(ground_truth_file, sampling_frequency=60):
+    with open(ground_truth_file) as f:
+        data = json.load(f)
+
+    gtTime = [gtdata["Timestamp"] for gtdata in data['/FullPackage']]
+    gtHR = [gtdata["Value"]["pulseRate"] for gtdata in data['/FullPackage']]
+    gtTrace = [gtdata["Value"]["waveform"] for gtdata in data['/FullPackage']]
+
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+
+    # Compute STFT
+    noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
+    nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
+
+    # Perform STFT
+    frequencies, times, Zxx = stft(filtered_signals, sampling_frequency, nperseg=nperseg, noverlap=noverlap)
+
+    magnitude_Zxx = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+    # Detect Peaks for each time slice
+    hrGT = []
+    for i in range(magnitude_Zxx.shape[1]):
+        peaks, _ = find_peaks(magnitude_Zxx[:, i])
+        if len(peaks) > 0:
+            peak_freq = frequencies[peaks[np.argmax(magnitude_Zxx[peaks, i])]]
+            hrGT.append(peak_freq * 60)
+        else:
+            hrGT.append(None)
+
+    return hrGT
+
+
+chrom_true = []
+chrom_pred = []
+# # base_dir = r'C:\Users\ilyas\Desktop\VHR\Datasets\UBFC Dataset'
 # base_dir = r'C:\Users\Admin\Desktop\UBFC Dataset\UBFC_DATASET'
 # for sub_folders in os.listdir(base_dir):
 #     # if sub_folders == 'UBFC1':
@@ -299,17 +333,19 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
 #                     gt = os.path.join(subjects, each_subject)
 #
 #             print(vid, gt)
-#             # hrES = chrom_framework(input_video=vid, dataset='UBFC2')
+#             hrES = chrom_framework(input_video=vid, dataset='UBFC2')
 #             hrGT = chrom_ubfc2(ground_truth_file=gt)
-#             # print(len(hrGT), len(hrES))
-#             # print('')
+#             print(len(hrGT), len(hrES))
+#             print('')
 #             chrom_true.append(np.mean(hrGT))
-#             # chrom_pred.append(np.mean(hrES))
+#             chrom_pred.append(np.mean(hrES))
 #
 # print(chrom_true)
-# # print(chrom_pred)
-# # print(mean_absolute_error(chrom_true, chrom_pred))
+# print(chrom_pred)
+# print(mean_absolute_error(chrom_true, chrom_pred))
 # # print(mean_absolute_error(chrom_true[8:], chrom_pred[8:]))
+
+# [5186, "{'framework': 'GREEN', 'ROI_type': 'ROI_I', 'width': 1, 'height': 1}", True, '()', 'CHROM', '()', 'stft_estimator', "{'signal_length': 12, 'increment': 1, 'bpm_type': 'continuous'}", False, 0.7173816216790636]
 
 # Without Mod for UBFC2
 # [108.01886792452831, 94.2741935483871, 109.04255319148936, 99.05660377358491, 112.02898550724638, 108.40579710144928, 110.28985507246377, 123.76811594202898, 68.82352941176471, 107.17391304347827, 76.3970588235294, 115.8695652173913, 93.07142857142857, 86.85714285714286, 120.5072463768116, 125.8695652173913, 102.68115942028986, 65.97014925373135, 106.54411764705883, 114.9, 98.23529411764706, 109.38775510204081, 98.04347826086956, 78.76811594202898, 105.43478260869566, 116.76470588235294, 116.44927536231884, 103.57142857142857, 119.28571428571429, 59.492753623188406, 109.14285714285714, 84.92753623188406, 86.15942028985508, 101.01449275362319, 95.07142857142857, 99.41176470588235, 82.82608695652173, 110.14492753623189, 97.13235294117646, 110.5072463768116, 90.8955223880597, 87.82608695652173]
@@ -367,7 +403,36 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
 # talk: 12.502989809896853
 
 
+base_dir = r"C:\Users\Admin\Desktop\PURE Dataset"
+subjects = ["{:02d}".format(i) for i in range(1, 11)]
+setups = ["{:02d}".format(i) for i in range(1, 7)]
 
+for each_setup in setups:
+    for each_subject in subjects:
+        if f"{each_subject}-{each_setup}" == "06-02":
+            continue
+        dir = os.listdir(os.path.join(base_dir, f"{each_subject}-{each_setup}"))
+        vid = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[0])
+        gt = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[1])
+
+        print(vid, gt)
+
+        input_video = [os.path.join(vid, x) for x in os.listdir(vid)]
+        hrES = chrom_framework(input_video, dataset='PURE')
+        chrom_pred.append(np.mean(hrES))
+
+        hrGT = chrom_pure(ground_truth_file=gt)
+        chrom_true.append(np.mean(hrGT))
+
+        print(len(hrGT), len(hrES))
+
+print(chrom_true)
+print(chrom_pred)
+print(mean_absolute_error(chrom_true, chrom_pred))
+
+# [136.61764705882354, 144.20289855072463, 106.94029850746269, 121.92307692307692, 131.49253731343285, 130.07575757575756, 127.12121212121212, 129.1044776119403, 134.02985074626866, 166.43939393939394, 150.44117647058823, 159.92537313432837, 114.41176470588235, 131.08695652173913, 133.60294117647058, 135.8450704225352, 123.13432835820896, 107.5, 128.3582089552239, 155.29761904761904, 143.85135135135135, 114.66216216216216, 138.02631578947367, 136.6883116883117, 141.03896103896105, 127.5, 103.61842105263158, 115.12987012987013, 149.48717948717947, 149.88095238095238, 145.53333333333333, 112.82894736842105, 139.87012987012986, 141.85897435897436, 146.6883116883117, 127.03947368421052, 104.74358974358974, 120.45977011494253, 159.49367088607596, 143.23529411764707, 148.46153846153845, 112.8030303030303, 130.45454545454547, 135.75757575757575, 135.37878787878788, 132.12121212121212, 109.31818181818181, 103.03030303030303, 150.75757575757575, 140.07246376811594, 140.3030303030303, 117.87878787878788, 128.4090909090909, 130.15151515151516, 136.19402985074626, 132.8030303030303, 110.8955223880597, 132.53731343283582, 156.13636363636363]
+# [67.2463768115942, 71.81159420289855, 53.208955223880594, 59.31818181818182, 80.74626865671642, 65.0, 125.37878787878788, 86.74242424242425, 90.68181818181819, 82.95454545454545, 73.91304347826087, 82.83582089552239, 56.81159420289855, 67.31884057971014, 83.75, 134.08450704225353, 59.701492537313435, 57.971014492753625, 96.1029411764706, 76.8452380952381, 72.02702702702703, 56.75675675675676, 68.83116883116882, 76.88311688311688, 70.51948051948052, 126.88311688311688, 58.83116883116883, 73.7012987012987, 73.31168831168831, 74.52380952380952, 71.6, 61.25, 69.6103896103896, 72.91666666666667, 73.05194805194805, 123.11688311688312, 51.23376623376623, 73.62068965517241, 74.36708860759494, 70.65217391304348, 72.0, 56.07692307692308, 65.0, 74.77272727272727, 67.57575757575758, 131.23076923076923, 51.13636363636363, 75.83333333333333, 75.07575757575758, 69.27536231884058, 70.38461538461539, 57.5, 64.0909090909091, 82.61538461538461, 67.46268656716418, 131.74242424242425, 54.39393939393939, 61.11940298507463, 78.03030303030303]
+# 56.63086720620157
 
 
 ### END TEST SECTION

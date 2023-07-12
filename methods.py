@@ -31,7 +31,10 @@ def CHROM(signal, fps, **params):
         filtered_signals = fir_bp_filter(signal=stacked_signals, fps=30, low=0.67, high=4.0)
         Xf, Yf = filtered_signals[:, 0], filtered_signals[:, 1]
 
-        alpha = np.std(Xf) / np.std(Yf)
+        if np.std(Yf) != 0:
+            alpha = np.std(Xf) / np.std(Yf)
+        else:
+            alpha = 0
         S = Xf - alpha * Yf
 
         SWin = np.multiply(S, windows.hann(len(S)))
@@ -57,7 +60,11 @@ def POS(signal, fps, **params):
         S1 = normalized[1] - normalized[2]
         S2 = normalized[1] + normalized[2] - 2 * normalized[0]
 
-        alpha = np.std(S1) / np.std(S2)
+        if np.std(S2) != 0:
+            alpha = np.std(S1) / np.std(S2)
+        else:
+            alpha = 0
+
         h = S1 + alpha * S2
 
         start = enum

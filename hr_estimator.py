@@ -11,8 +11,9 @@ def get_bpm(signal, fps, type, remove_outlier, params):
     estimator_method = getattr(estimator_module, type)
 
     if type == 'stft_estimator' and 'bpm_type' in params:
-        del params['bpm_type']  # Delete bpm type since stft will give continuous hr values
-        hr = estimator_method(signal, fps, remove_outlier, **params)
+        params_copy = params.copy()
+        del params_copy['bpm_type']  # Delete bpm type since stft will give continuous hr values
+        hr = estimator_method(signal, fps, remove_outlier, **params_copy)
     else:
         hr = estimator_method(signal, fps, remove_outlier, **params)
 
@@ -86,10 +87,16 @@ def outlier_removal(frequencies, magnitude):
 def detect_peaks(frequencies, magnitude):
     # Detect Peaks for each time slice
     hr = []
-    for i in range(magnitude.shape[1]):
-        mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
-        masked_frequencies = frequencies[mask]
-        masked_magnitude = magnitude[mask, i]
+
+    for i in range(min(magnitude.shape)):
+        if magnitude.shape[1] > magnitude.shape[0]:
+            mask = (frequencies[i] >= 0.67) & (frequencies[i] <= 4)
+            masked_frequencies = frequencies[i][mask]
+            masked_magnitude = magnitude[i][mask]
+        else:
+            mask = (frequencies >= 0.67) & (frequencies <= 4)  # create a mask for the desired frequency range
+            masked_frequencies = frequencies[mask]
+            masked_magnitude = magnitude[mask, i]
 
         peaks, _ = find_peaks(masked_magnitude)
         if len(peaks) > 0:
@@ -118,8 +125,9 @@ def stft_estimator(signal, fps, remove_outlier, signal_length=None, increment=No
         magnitude_Zxx = []
 
         for window in signal:
-            freqs, Zxx = np.fft.rfft(window, fps)  # Compute the one-dimensional n-point discrete Fourier Transform for real input
-            magnitudes = np.abs(Zxx)  # Calculate the magnitude of Zxx
+
+            freqs = rfftfreq(len(window), d=1 / fps)
+            magnitudes = np.abs(rfft(window)) ** 2
 
             frequencies.append(freqs)
             magnitude_Zxx.append(magnitudes)
@@ -131,7 +139,7 @@ def stft_estimator(signal, fps, remove_outlier, signal_length=None, increment=No
     if remove_outlier:
         hr = outlier_removal(np.array(frequencies), np.array(magnitude_Zxx))
     else:
-        hr = detect_peaks(frequencies, magnitude_Zxx)
+        hr = detect_peaks(np.array(frequencies), np.array(magnitude_Zxx))
 
     return hr
 
@@ -154,7 +162,7 @@ def fft_estimator(signal, fps, remove_outlier, bpm_type, signal_length=None, inc
 
         max_peak_index = np.argmax(peak_powers)
         max_peak_frequency = peak_freqs[max_peak_index]
-        hr = int(max_peak_frequency * 60)
+        hr = max_peak_frequency * 60
 
     elif bpm_type == 'continuous':
         if signal.ndim == 2:

@@ -32,7 +32,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
     raw_sig = extract_raw_sig(input_video, framework='ICA', width=0.6, height=1)  # get the raw RGB signals
     if dataset is None:
         fps = get_fps(input_video)  # find the fps of the video
-    elif dataset == 'UBFC1' or dataset == 'UBFC2':
+    elif dataset == 'UBFC1' or dataset == 'UBFC2' or dataset == 'PURE':
         fps = 30
     elif dataset == 'LGI_PPGI':
         fps = 25
@@ -40,92 +40,23 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
         assert False, "Invalid dataset name. Please choose one of the valid available datasets " \
                      "types: 'UBFC1', 'UBFC2', or 'LGI_PPGI'. If you are using your own dataset, enter 'None' "
 
-    detrended = detrending_filter(np.array(raw_sig), 10)
-    normalized = normalize(detrended, normalize_type='zero_mean_unit_variance')
-
-    # Apply JADE ICA algorithm and select the second component
-    W = jadeR(normalized, m=3)
-    bvp = np.array(np.dot(W, normalized))
-
-    bvp = bvp[1].flatten()
-    ma_filter = np.convolve(bvp, np.ones(9), mode='valid') / 9
-    bvp = fir_bp_filter(signal=ma_filter, fps=fps, low=0.7, high=4.0)
-
-    windowed_pulse_sig = moving_window(sig=bvp, fps=fps, window_size=11, increment=5)
-    hrES = []
-    prev_hr = None
-    for each_signal_window in windowed_pulse_sig:
-        windowed_signal = each_signal_window * windows.hann(len(each_signal_window))
-        peak_freqs, peak_powers = welch(windowed_signal, fs=fps, nperseg=len(windowed_signal), nfft=4096)
-
-        # For the first previous HR value
-        if prev_hr is None:
-            # Find the highest peak
-            max_peak_index = np.argmax(peak_powers)
-            max_peak_frequency = peak_freqs[max_peak_index]
-
-            hr = int(max_peak_frequency * 60)
-            prev_hr = hr
-        else:
-            max_peak_index = np.argmax(peak_powers)
-            max_peak_frequency = peak_freqs[max_peak_index]
-
-            hr = int(max_peak_frequency * 60)
-
-            # If the difference between the current pulse rate estimation and the last computed value exceeded
-            # the threshold, the algorithm rejected it and searched the operational frequency range for the
-            # frequency corresponding to the next highest power that met this constraint
-            while abs(prev_hr - hr) >= 12:
-                # Remove the previously wrongly determined power and frequency values from the list
-                max_peak_mask = (peak_freqs == max_peak_frequency)
-                peak_freqs = peak_freqs[~max_peak_mask]
-                peak_powers = peak_powers[~max_peak_mask]
-
-                #  If no frequency peaks that met the criteria were located, then
-                # the algorithm retained the current pulse frequency estimation
-                if len(peak_freqs) == 0:
-                    hr = prev_hr
-                    break
-
-                max_peak_index = np.argmax(peak_powers)
-                max_peak_frequency = peak_freqs[max_peak_index]
-                hr = int(max_peak_frequency * 60)
-
-            prev_hr = hr
-        hrES.append(hr)
-
-    window_size = 7
-    rolling_mean_hrES = np.convolve(hrES, np.ones(window_size), mode='valid') / window_size
-    hr = np.mean(rolling_mean_hrES)
-
-    return hr
-
-    # # signal windowing with 96.7% overlap
-    # windowed_sig = moving_window(sig=raw_sig, fps=fps, window_size=30, increment=1)
+    # detrended = detrending_filter(np.array(raw_sig), 10)
+    # normalized = normalize(detrended, normalize_type='zero_mean_unit_variance')
+    #
+    # # Apply JADE ICA algorithm and select the second component
+    # W = jadeR(normalized, m=3)
+    # bvp = np.array(np.dot(W, normalized))
+    #
+    # bvp = bvp[1].flatten()
+    # ma_filter = np.convolve(bvp, np.ones(9), mode='valid') / 9
+    # bvp = fir_bp_filter(signal=ma_filter, fps=fps, low=0.7, high=4.0)
+    #
+    # windowed_pulse_sig = moving_window(sig=bvp, fps=fps, window_size=11, increment=5)
     # hrES = []
-    #
-    # prev_hr = None  # Previous HR value
-    # for sig in windowed_sig:
-    #     normalized = normalize(sig, normalize_type='zero_mean_unit_variance')  # normalize the windowed signal
-    #
-    #     # Apply JADE ICA algorithm and select the second component
-    #     W = jadeR(normalized, m=3)
-    #     bvp = np.array(np.dot(W, normalized))
-    #     bvp = bvp[comp].flatten()
-    #     bvp = fir_bp_filter(signal=bvp, fps=fps, low=0.75, high=4.0)
-    #
-    #     # Compute the positive frequencies and the corresponding power spectrum
-    #     freqs = rfftfreq(len(bvp), d=1 / fps)
-    #     power_spectrum = np.abs(rfft(bvp)) ** 2
-    #
-    #     # Find the maximum peak between 0.75 Hz and 4 Hz
-    #     mask = (freqs >= 0.75) & (freqs <= 4)
-    #     filtered_power_spectrum = power_spectrum[mask]
-    #     filtered_freqs = freqs[mask]
-    #
-    #     peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
-    #     peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
-    #     peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+    # prev_hr = None
+    # for each_signal_window in windowed_pulse_sig:
+    #     windowed_signal = each_signal_window * windows.hann(len(each_signal_window))
+    #     peak_freqs, peak_powers = welch(windowed_signal, fs=fps, nperseg=len(windowed_signal), nfft=4096)
     #
     #     # For the first previous HR value
     #     if prev_hr is None:
@@ -144,7 +75,7 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
     #         # If the difference between the current pulse rate estimation and the last computed value exceeded
     #         # the threshold, the algorithm rejected it and searched the operational frequency range for the
     #         # frequency corresponding to the next highest power that met this constraint
-    #         while abs(prev_hr - hr) >= hr_change_threshold:
+    #         while abs(prev_hr - hr) >= 12:
     #             # Remove the previously wrongly determined power and frequency values from the list
     #             max_peak_mask = (peak_freqs == max_peak_frequency)
     #             peak_freqs = peak_freqs[~max_peak_mask]
@@ -163,11 +94,81 @@ def ica_framework(input_video, comp=1, hr_change_threshold=12, dataset=None):
     #         prev_hr = hr
     #     hrES.append(hr)
     #
-    # return hrES
+    # window_size = 7
+    # rolling_mean_hrES = np.convolve(hrES, np.ones(window_size), mode='valid') / window_size
+    # hr = np.mean(rolling_mean_hrES)
+    #
+    # return hr
+
+    # signal windowing with 96.7% overlap
+    windowed_sig = moving_window(sig=raw_sig, fps=fps, window_size=30, increment=1)
+    hrES = []
+
+    prev_hr = None  # Previous HR value
+    for sig in windowed_sig:
+        normalized = normalize(sig, normalize_type='zero_mean_unit_variance')  # normalize the windowed signal
+
+        # Apply JADE ICA algorithm and select the second component
+        W = jadeR(normalized, m=3)
+        bvp = np.array(np.dot(W, normalized))
+        bvp = bvp[comp].flatten()
+        bvp = fir_bp_filter(signal=bvp, fps=fps, low=0.75, high=4.0)
+
+        # Compute the positive frequencies and the corresponding power spectrum
+        freqs = rfftfreq(len(bvp), d=1 / fps)
+        power_spectrum = np.abs(rfft(bvp)) ** 2
+
+        # Find the maximum peak between 0.75 Hz and 4 Hz
+        mask = (freqs >= 0.75) & (freqs <= 4)
+        filtered_power_spectrum = power_spectrum[mask]
+        filtered_freqs = freqs[mask]
+
+        peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
+        peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
+        peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+
+        # For the first previous HR value
+        if prev_hr is None:
+            # Find the highest peak
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+            prev_hr = hr
+        else:
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+
+            # If the difference between the current pulse rate estimation and the last computed value exceeded
+            # the threshold, the algorithm rejected it and searched the operational frequency range for the
+            # frequency corresponding to the next highest power that met this constraint
+            while abs(prev_hr - hr) >= hr_change_threshold:
+                # Remove the previously wrongly determined power and frequency values from the list
+                max_peak_mask = (peak_freqs == max_peak_frequency)
+                peak_freqs = peak_freqs[~max_peak_mask]
+                peak_powers = peak_powers[~max_peak_mask]
+
+                #  If no frequency peaks that met the criteria were located, then
+                # the algorithm retained the current pulse frequency estimation
+                if len(peak_freqs) == 0:
+                    hr = prev_hr
+                    break
+
+                max_peak_index = np.argmax(peak_powers)
+                max_peak_frequency = peak_freqs[max_peak_index]
+                hr = int(max_peak_frequency * 60)
+
+            prev_hr = hr
+        hrES.append(hr)
+
+    return hrES
 
 
 import pandas as pd
 import os
+import json
 from sklearn.metrics import mean_absolute_error
 
 def ica_ubfc1(ground_truth_file, sampling_frequency=60):
@@ -368,6 +369,74 @@ def ica_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     return hrGT
 
 
+def ica_pure(ground_truth_file, sampling_frequency=60):
+    with open(ground_truth_file) as f:
+        data = json.load(f)
+
+    gtTime = [gtdata["Timestamp"] for gtdata in data['/FullPackage']]
+    gtHR = [gtdata["Value"]["pulseRate"] for gtdata in data['/FullPackage']]
+    gtTrace = [gtdata["Value"]["waveform"] for gtdata in data['/FullPackage']]
+
+    # signal windowing with 96.7% overlap
+    windowed_sig = moving_window(sig=gtTrace, fps=sampling_frequency, window_size=30, increment=1)
+    hrGT = []
+
+    prev_hr = None  # Previous HR value
+    for sig in windowed_sig:
+        normalized = (np.array(sig) - np.mean(sig)) / np.std(sig)
+
+        # Compute the positive frequencies and the corresponding power spectrum
+        freqs = rfftfreq(len(normalized), d=1 / sampling_frequency)
+        power_spectrum = np.abs(rfft(normalized)) ** 2
+
+        # Find the maximum peak between 0.75 Hz and 4 Hz
+        mask = (freqs >= 0.75) & (freqs <= 4)
+        filtered_power_spectrum = power_spectrum[mask]
+        filtered_freqs = freqs[mask]
+
+        peaks, _ = find_peaks(filtered_power_spectrum)  # index of the peaks
+        peak_freqs = filtered_freqs[peaks]  # corresponding peaks frequencies
+        peak_powers = filtered_power_spectrum[peaks]  # corresponding peaks powers
+
+        # For the first previous HR value
+        if prev_hr is None:
+            # Find the highest peak
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+            prev_hr = hr
+        else:
+            max_peak_index = np.argmax(peak_powers)
+            max_peak_frequency = peak_freqs[max_peak_index]
+
+            hr = int(max_peak_frequency * 60)
+
+            # If the difference between the current pulse rate estimation and the last computed value exceeded
+            # the threshold, the algorithm rejected it and searched the operational frequency range for the
+            # frequency corresponding to the next highest power that met this constraint
+            while abs(prev_hr - hr) >= 12:
+                # Remove the previously wrongly determined power and frequency values from the list
+                max_peak_mask = (peak_freqs == max_peak_frequency)
+                peak_freqs = peak_freqs[~max_peak_mask]
+                peak_powers = peak_powers[~max_peak_mask]
+
+                #  If no frequency peaks that met the criteria were located, then
+                # the algorithm retained the current pulse frequency estimation
+                if len(peak_freqs) == 0:
+                    hr = prev_hr
+                    break
+
+                max_peak_index = np.argmax(peak_powers)
+                max_peak_frequency = peak_freqs[max_peak_index]
+                hr = int(max_peak_frequency * 60)
+
+            prev_hr = hr
+        hrGT.append(hr)
+
+    return hrGT
+
+
 
 # MAE = []
 ica_true = []
@@ -466,3 +535,31 @@ ica_pred = []
 # resting: 10.512098799823546
 # rotation: 4.453209189693691
 # talk: 7.938521670317034
+
+
+base_dir = r"C:\Users\Admin\Desktop\PURE Dataset"
+subjects = ["{:02d}".format(i) for i in range(1, 11)]
+setups = ["{:02d}".format(i) for i in range(1, 7)]
+
+for each_setup in setups:
+    for each_subject in subjects:
+        if f"{each_subject}-{each_setup}" == "06-02":
+            continue
+        dir = os.listdir(os.path.join(base_dir, f"{each_subject}-{each_setup}"))
+        vid = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[0])
+        gt = os.path.join(base_dir, f"{each_subject}-{each_setup}", dir[1])
+
+        # print(vid, gt)
+
+        input_video = [os.path.join(vid, x) for x in os.listdir(vid)]
+        hrES = ica_framework(input_video, dataset='PURE')
+        ica_pred.append(np.mean(hrES))
+
+        hrGT = ica_pure(ground_truth_file=gt)
+        ica_true.append(np.mean(hrGT))
+
+        print(len(hrGT), len(hrES))
+
+print(ica_true)
+print(ica_pred)
+print(mean_absolute_error(ica_true, ica_pred))

@@ -19,7 +19,7 @@ def normalize(signal, normalize_type=None):
     std_dev = np.std(signal, axis=0)
 
     if normalize_type == 'mean_normalization':
-        normalized_signal = signal / mean
+        normalized_signal = np.where(mean != 0, signal / mean, 0)
     elif normalize_type == 'zero_mean':
         normalized_signal = signal - mean
     elif normalize_type == 'zero_mean_unit_variance':
