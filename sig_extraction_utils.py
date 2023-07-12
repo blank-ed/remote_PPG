@@ -68,9 +68,9 @@ def extract_raw_sig(input_video, framework=None, ROI_type='None', width=1, heigh
     frame_count = 0
     usable_roi_count = 0
 
-    # for frame in extract_frames_yield(input_video):
-    for frame in input_video:
-        frame = cv2.imread(frame)
+    for frame in extract_frames_yield(input_video):
+    # for frame in input_video:
+    #     frame = cv2.imread(frame)
         frame_count += 1
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
