@@ -182,7 +182,7 @@ def chrom_ubfc1(ground_truth_file, sampling_frequency=60):
     gtHR = gtdata.iloc[:, 1]
 
     normalized = np.array(gtTrace) / np.mean(gtTrace)
-    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -213,7 +213,7 @@ def chrom_ubfc2(ground_truth_file, sampling_frequency=30):
     gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
 
     normalized = np.array(gtTrace) / np.mean(gtTrace)
-    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -244,7 +244,7 @@ def chrom_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     gtTrace = gtdata.iloc[:, 2].tolist()
 
     normalized = np.array(gtTrace) / np.mean(gtTrace)
-    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -277,7 +277,7 @@ def chrom_pure(ground_truth_file, sampling_frequency=60):
     gtTrace = [gtdata["Value"]["waveform"] for gtdata in data['/FullPackage']]
 
     normalized = np.array(gtTrace) / np.mean(gtTrace)
-    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)

@@ -87,6 +87,9 @@ def pos_ubfc1(ground_truth_file, sampling_frequency=60):
     gtTime = (gtdata.iloc[:, 0] / 1000).tolist()
     gtHR = gtdata.iloc[:, 1]
 
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
+
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
     nperseg = sampling_frequency * 12  # Length of fourier window (12 seconds as per the paper)
@@ -113,7 +116,7 @@ def pos_ubfc2(ground_truth_file, sampling_frequency=30):
     gtHR = [float(item) for item in gtdata.iloc[1, 0].split(' ') if item != '']
 
     normalized = np.array(gtTrace) / np.mean(gtTrace)
-    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
@@ -140,6 +143,9 @@ def pos_lgi_ppgi(ground_truth_file, sampling_frequency=60):
     gtTime = (gtdata.iloc[:, 0]).tolist()
     gtHR = gtdata.iloc[:, 1].tolist()
     gtTrace = gtdata.iloc[:, 2].tolist()
+
+    normalized = np.array(gtTrace) / np.mean(gtTrace)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (
@@ -171,7 +177,7 @@ def pos_pure(ground_truth_file, sampling_frequency=60):
     gtTrace = [gtdata["Value"]["waveform"] for gtdata in data['/FullPackage']]
 
     normalized = np.array(gtTrace) / np.mean(gtTrace)
-    filtered_signals = fir_bp_filter(signal=normalized, fps=30, low=0.67, high=4.0)
+    filtered_signals = fir_bp_filter(signal=normalized, fps=sampling_frequency, low=0.67, high=4.0)
 
     # Compute STFT
     noverlap = sampling_frequency * (12 - 1)  # Does not mention the overlap so incremented by 1 second (so ~91% overlap)
